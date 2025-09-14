@@ -1,0 +1,103 @@
+export const theme = {
+  colors: {
+    primary: '#6366F1',
+    primaryLight: '#818CF8',
+    primaryDark: '#4F46E5',
+    secondary: '#EC4899',
+    secondaryLight: '#F472B6',
+    accent: '#10B981',
+    background: '#F9FAFB',
+    surface: '#FFFFFF',
+    text: '#111827',
+    textSecondary: '#6B7280',
+    textLight: '#9CA3AF',
+    border: '#E5E7EB',
+    error: '#EF4444',
+    success: '#10B981',
+    warning: '#F59E0B',
+    gradientStart: '#6366F1',
+    gradientEnd: '#EC4899',
+  },
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+    xxl: 48,
+  },
+  borderRadius: {
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 24,
+    full: 9999,
+  },
+  typography: {
+    largeTitle: {
+      fontSize: 34,
+      fontWeight: '700' as const,
+      letterSpacing: -0.5,
+    },
+    title1: {
+      fontSize: 28,
+      fontWeight: '600' as const,
+      letterSpacing: -0.3,
+    },
+    title2: {
+      fontSize: 22,
+      fontWeight: '600' as const,
+    },
+    title3: {
+      fontSize: 20,
+      fontWeight: '600' as const,
+    },
+    headline: {
+      fontSize: 17,
+      fontWeight: '600' as const,
+    },
+    body: {
+      fontSize: 17,
+      fontWeight: '400' as const,
+    },
+    callout: {
+      fontSize: 16,
+      fontWeight: '400' as const,
+    },
+    subheadline: {
+      fontSize: 15,
+      fontWeight: '400' as const,
+    },
+    footnote: {
+      fontSize: 13,
+      fontWeight: '400' as const,
+    },
+    caption: {
+      fontSize: 12,
+      fontWeight: '400' as const,
+    },
+  },
+  shadows: {
+    sm: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    md: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+    lg: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+  },
+};
