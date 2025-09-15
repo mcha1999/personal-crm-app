@@ -90,7 +90,16 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
       const completed = completedStr === 'true';
       
       const preferencesStr = await AsyncStorage.getItem(SYNC_PREFERENCES_KEY);
-      const preferences = preferencesStr ? JSON.parse(preferencesStr) : defaultSyncPreferences;
+      let preferences = defaultSyncPreferences;
+      if (preferencesStr) {
+        try {
+          preferences = JSON.parse(preferencesStr);
+        } catch (parseError) {
+          console.error('[Onboarding] Failed to parse sync preferences, using defaults:', parseError);
+          // Clear corrupted data
+          await AsyncStorage.removeItem(SYNC_PREFERENCES_KEY);
+        }
+      }
       
       console.log('[Onboarding] Status:', { completed, preferences });
       
