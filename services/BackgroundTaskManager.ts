@@ -4,6 +4,7 @@ import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 import { GmailSync } from './GmailSync';
 import { ScoreJob } from '@/jobs/ScoreJob';
+import { FollowUpService } from './FollowUpService';
 
 // Task names
 const GMAIL_DELTA_SYNC_TASK = 'gmailDeltaSync';
@@ -173,32 +174,45 @@ export class BackgroundTaskManager {
    * - No external AI/ML services or cloud processing
    * - Relationship scoring based on local interaction patterns
    * - Search indexing using local SQLite FTS
+   * - AI follow-up detection from recent conversations
    * 
    * Local Processing:
    * - Interaction frequency analysis
    * - Relationship strength calculation
    * - Contact engagement scoring
    * - Search index optimization
+   * - Follow-up task generation from AI analysis
    */
-  async runIndexAndScore(): Promise<{ success: boolean; scoresComputed: number; error?: string }> {
+  async runIndexAndScore(): Promise<{ success: boolean; scoresComputed: number; followUpTasks: number; error?: string }> {
     console.log('[BackgroundTask] Starting local index and score update...');
     
     try {
+      // Run scoring job
       const scoreJob = ScoreJob.getInstance();
-      const result = await scoreJob.run();
+      const scoreResult = await scoreJob.run();
       
-      console.log('[BackgroundTask] Local scoring completed');
-      console.log(`[BackgroundTask] Updated scores for ${result.scoresComputed} contacts (locally)`);
+      // Process follow-ups from recent conversations
+      const followUpResult = await FollowUpService.processThreadsForFollowUps();
+      
+      console.log('[BackgroundTask] Local scoring and AI follow-up detection completed');
+      console.log(`[BackgroundTask] Updated scores for ${scoreResult.scoresComputed} contacts (locally)`);
+      console.log(`[BackgroundTask] Created ${followUpResult.tasksCreated} follow-up tasks from AI analysis`);
       
       this.lastIndexScore = new Date();
       await this.saveLastRunTime('lastIndexScore', this.lastIndexScore);
       
-      return result;
+      return {
+        success: scoreResult.success,
+        scoresComputed: scoreResult.scoresComputed,
+        followUpTasks: followUpResult.tasksCreated,
+        error: scoreResult.error
+      };
     } catch (error) {
       console.error('[BackgroundTask] Index and score failed:', error);
       return {
         success: false,
         scoresComputed: 0,
+        followUpTasks: 0,
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
@@ -322,9 +336,10 @@ export class BackgroundTaskManager {
 
   /**
    * Manual Refresh - Run both tasks immediately
+   * Includes AI follow-up detection from recent messages
    */
   async manualRefresh(): Promise<{ gmailResult: any; scoreResult: any }> {
-    console.log('[BackgroundTask] Starting manual refresh...');
+    console.log('[BackgroundTask] Starting manual refresh with AI follow-up detection...');
     
     const [gmailResult, scoreResult] = await Promise.allSettled([
       this.runGmailDeltaSync(),
