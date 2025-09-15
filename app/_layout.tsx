@@ -6,8 +6,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { DatabaseProvider, useDatabase } from "@/contexts/DatabaseContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ContactsProvider } from "@/contexts/ContactsContext";
-import { OnboardingProvider } from "@/contexts/OnboardingContext";
+import { OnboardingProvider, useOnboarding } from "@/contexts/OnboardingContext";
 import { AuthScreen } from "@/components/AuthScreen";
+import { OnboardingFlow } from "@/components/OnboardingFlow";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { BackgroundTaskManager } from "@/services/BackgroundTaskManager";
 
@@ -30,9 +31,10 @@ function RootLayoutNav() {
 function AppContent() {
   const { isInitialized, error } = useDatabase();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isOnboardingCompleted, isLoading: onboardingLoading } = useOnboarding();
 
   useEffect(() => {
-    if (isInitialized && !authLoading) {
+    if (isInitialized && !authLoading && !onboardingLoading) {
       SplashScreen.hideAsync();
       
       // Initialize background tasks when app is ready
@@ -48,7 +50,7 @@ function AppContent() {
       
       initBackgroundTasks();
     }
-  }, [isInitialized, authLoading]);
+  }, [isInitialized, authLoading, onboardingLoading]);
 
   if (error) {
     return (
@@ -59,12 +61,12 @@ function AppContent() {
     );
   }
 
-  if (!isInitialized || authLoading) {
+  if (!isInitialized || authLoading || onboardingLoading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
         <Text style={styles.loadingText}>
-          {!isInitialized ? 'Initializing...' : 'Checking authentication...'}
+          {!isInitialized ? 'Initializing...' : authLoading ? 'Checking authentication...' : 'Loading...'}
         </Text>
       </View>
     );
@@ -72,6 +74,10 @@ function AppContent() {
 
   if (!isAuthenticated) {
     return <AuthScreen />;
+  }
+  
+  if (!isOnboardingCompleted) {
+    return <OnboardingFlow />;
   }
 
   return <RootLayoutNav />;

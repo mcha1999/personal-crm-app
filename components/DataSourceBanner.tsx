@@ -36,7 +36,7 @@ export const DataSourceBanner: React.FC = () => {
   return (
     <TouchableOpacity 
       style={styles.banner} 
-      onPress={() => router.push('/settings')}
+      onPress={() => router.push('/(tabs)/settings')}
       activeOpacity={0.8}
     >
       <View style={styles.content}>
