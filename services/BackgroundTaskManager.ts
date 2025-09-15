@@ -243,26 +243,50 @@ export class BackgroundTaskManager {
     try {
       await this.initializeBackgroundTasks();
 
-      // Register Gmail Delta Sync (quick poll a few times per day)
-      const gmailStatus = await BackgroundFetch.getStatusAsync();
-      if (gmailStatus === BackgroundFetch.BackgroundFetchStatus.Available) {
-        await BackgroundFetch.registerTaskAsync(GMAIL_DELTA_SYNC_TASK, {
-          minimumInterval: 4 * 60 * 60, // 4 hours
-          stopOnTerminate: false,
-          startOnBoot: true,
-        });
-        console.log('[BackgroundTask] Gmail delta sync registered (4 hour interval)');
+      // Check if background fetch is available
+      const status = await BackgroundFetch.getStatusAsync();
+      
+      if (status === BackgroundFetch.BackgroundFetchStatus.Restricted) {
+        console.warn('[BackgroundTask] Background fetch is restricted by the system');
+        return;
+      }
+      
+      if (status === BackgroundFetch.BackgroundFetchStatus.Denied) {
+        console.warn('[BackgroundTask] Background fetch permission denied by user');
+        return;
       }
 
-      // Register Index and Score (heavier nightly job)
-      await BackgroundFetch.registerTaskAsync(INDEX_AND_SCORE_TASK, {
-        minimumInterval: 24 * 60 * 60, // 24 hours
-        stopOnTerminate: false,
-        startOnBoot: true,
-      });
-      console.log('[BackgroundTask] Index and score registered (24 hour interval)');
+      // Only register if available
+      if (status === BackgroundFetch.BackgroundFetchStatus.Available) {
+        // Register Gmail Delta Sync (quick poll a few times per day)
+        try {
+          await BackgroundFetch.registerTaskAsync(GMAIL_DELTA_SYNC_TASK, {
+            minimumInterval: 4 * 60 * 60, // 4 hours
+            stopOnTerminate: false,
+            startOnBoot: true,
+          });
+          console.log('[BackgroundTask] Gmail delta sync registered (4 hour interval)');
+        } catch (error) {
+          console.warn('[BackgroundTask] Could not register Gmail sync task:', error);
+        }
+
+        // Register Index and Score (heavier nightly job)
+        try {
+          await BackgroundFetch.registerTaskAsync(INDEX_AND_SCORE_TASK, {
+            minimumInterval: 24 * 60 * 60, // 24 hours
+            stopOnTerminate: false,
+            startOnBoot: true,
+          });
+          console.log('[BackgroundTask] Index and score registered (24 hour interval)');
+        } catch (error) {
+          console.warn('[BackgroundTask] Could not register index/score task:', error);
+        }
+      } else {
+        console.warn('[BackgroundTask] Background fetch not available on this device');
+      }
     } catch (error) {
-      console.error('[BackgroundTask] Failed to register background tasks:', error);
+      // Log as warning instead of error since this is not critical for app functionality
+      console.warn('[BackgroundTask] Background task registration not available:', error);
     }
   }
 
@@ -308,12 +332,27 @@ export class BackgroundTaskManager {
    * - All processing happens on device even when app is backgrounded
    */
   async scheduleBackgroundTasks(): Promise<void> {
-    console.log('[BackgroundTask] Scheduling privacy-compliant background tasks...');
+    console.log('[BackgroundTask] Attempting to schedule background tasks...');
     
-    await this.registerBackgroundTasks();
-    
-    console.log('[BackgroundTask] Gmail sync scheduled (device-only, every 4 hours)');
-    console.log('[BackgroundTask] Index & Score scheduled (local processing, every 24 hours)');
+    try {
+      await this.registerBackgroundTasks();
+      
+      // Check if tasks were actually registered
+      const gmailRegistered = await this.isTaskRegistered(GMAIL_DELTA_SYNC_TASK);
+      const scoreRegistered = await this.isTaskRegistered(INDEX_AND_SCORE_TASK);
+      
+      if (gmailRegistered) {
+        console.log('[BackgroundTask] Gmail sync scheduled (device-only, every 4 hours)');
+      }
+      if (scoreRegistered) {
+        console.log('[BackgroundTask] Index & Score scheduled (local processing, every 24 hours)');
+      }
+      if (!gmailRegistered && !scoreRegistered) {
+        console.log('[BackgroundTask] Background tasks not available on this platform/device');
+      }
+    } catch (error) {
+      console.log('[BackgroundTask] Background tasks not available:', error);
+    }
   }
 
   /**

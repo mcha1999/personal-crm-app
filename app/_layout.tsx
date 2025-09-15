@@ -38,13 +38,14 @@ function AppContent() {
       SplashScreen.hideAsync();
       
       // Initialize background tasks when app is ready
+      // Note: Background tasks may not work in Expo Go, but will work in production builds
       const initBackgroundTasks = async () => {
         try {
           const taskManager = BackgroundTaskManager.getInstance();
           await taskManager.scheduleBackgroundTasks();
-          console.log('[App] Background tasks initialized');
         } catch (error) {
-          console.error('[App] Failed to initialize background tasks:', error);
+          // This is expected in Expo Go or when background fetch is not available
+          console.log('[App] Background tasks not available on this platform/environment');
         }
       };
       
