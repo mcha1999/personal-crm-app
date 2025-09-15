@@ -7,12 +7,14 @@ import {
   SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
-import { Mail, CheckCircle, XCircle, AlertCircle, ExternalLink } from 'lucide-react-native';
+import { Mail, CheckCircle, XCircle, AlertCircle, ExternalLink, HelpCircle } from 'lucide-react-native';
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useRouter } from 'expo-router';
 
 export function GmailConnectionScreen() {
   const { connectGmail, steps, completeStep } = useOnboarding();
   const [isConnecting, setIsConnecting] = useState(false);
+  const router = useRouter();
   
   const currentStep = steps.find(step => step.id === 'gmail');
   const isCompleted = currentStep?.completed || false;
@@ -89,10 +91,20 @@ export function GmailConnectionScreen() {
         </View>
 
         {hasError && (
-          <View style={styles.errorContainer}>
-            <AlertCircle size={20} color="#FF3B30" />
-            <Text style={styles.errorText}>{currentStep?.error}</Text>
-          </View>
+          <>
+            <View style={styles.errorContainer}>
+              <AlertCircle size={20} color="#FF3B30" />
+              <Text style={styles.errorText}>{currentStep?.error}</Text>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.helpButton}
+              onPress={() => router.push('/gmail-setup')}
+            >
+              <HelpCircle size={20} color="#007AFF" />
+              <Text style={styles.helpButtonText}>View Setup Guide</Text>
+            </TouchableOpacity>
+          </>
         )}
 
         {currentStep?.inProgress && (
@@ -298,5 +310,20 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6,
+  },
+  helpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E3F2FD',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+  },
+  helpButtonText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500',
+    marginLeft: 6,
   },
 });

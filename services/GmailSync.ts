@@ -1,10 +1,13 @@
 import { Platform } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
-import * as Crypto from 'expo-crypto';
+import * as WebBrowser from 'expo-web-browser';
 import * as SecureStore from 'expo-secure-store';
 import { Thread } from '@/models/Thread';
 import { Message } from '@/models/Message';
 import { Interaction } from '@/models/Interaction';
+
+// Ensure web browser sessions complete properly
+WebBrowser.maybeCompleteAuthSession();
 
 
 interface GmailMessage {
@@ -48,19 +51,37 @@ export class GmailSync {
   private static instance: GmailSync;
   
   // OAuth Configuration - Device-Only
-  // Note: For production, you need to register your app with Google Cloud Console
-  // and get a proper OAuth 2.0 client ID
-  private readonly clientId = '1234567890-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com';
+  // IMPORTANT: Replace with your actual Google OAuth Client ID
+  // To get a client ID:
+  // 1. Go to https://console.cloud.google.com
+  // 2. Create a new project or select existing
+  // 3. Enable Gmail API
+  // 4. Create OAuth 2.0 credentials (Web application type)
+  // 5. Add redirect URIs: https://auth.expo.io/@your-username/your-app-slug
+  private readonly clientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
   private redirectUri: string = '';
   private readonly scopes = [
     'https://www.googleapis.com/auth/gmail.readonly',
-    'https://www.googleapis.com/auth/gmail.metadata'
+    'https://www.googleapis.com/auth/gmail.metadata',
+    'https://www.googleapis.com/auth/userinfo.email'
   ];
+  
+  private discovery = {
+    authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenEndpoint: 'https://oauth2.googleapis.com/token',
+    revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
+  };
   
   private readonly baseUrl = 'https://gmail.googleapis.com/gmail/v1';
   
   private constructor() {
-    this.redirectUri = AuthSession.makeRedirectUri();
+    // Generate redirect URI for OAuth
+    // For Expo Go: uses auth.expo.io proxy
+    // For standalone apps: uses your app's custom scheme
+    this.redirectUri = AuthSession.makeRedirectUri({
+      scheme: 'kin-app' // Replace with your app scheme for production
+    });
+    console.log('[GmailSync] Redirect URI:', this.redirectUri);
   }
 
   static getInstance(): GmailSync {
@@ -75,30 +96,78 @@ export class GmailSync {
    * 
    * Privacy Implementation:
    * - Uses PKCE (Proof Key for Code Exchange) for enhanced security
-   * - Direct OAuth flow with Google (no proxy)
+   * - Direct OAuth flow with Google (no proxy in production)
    * - Tokens stored in device secure storage only
    */
   async authenticate(): Promise<boolean> {
     try {
       console.log('[GmailSync] Starting OAuth 2.0 authentication...');
       
-      // For demo purposes, we'll simulate a successful authentication
-      // In production, you need:
-      // 1. Register your app in Google Cloud Console
-      // 2. Get a proper OAuth 2.0 client ID
-      // 3. Configure redirect URIs
-      // 4. Implement proper OAuth flow
+      // Check if we have a valid client ID
+      if (this.clientId === 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com' || !this.clientId.includes('.apps.googleusercontent.com')) {
+        console.error('[GmailSync] Invalid Google Client ID. Please configure your OAuth credentials.');
+        console.log('[GmailSync] To enable Gmail sync:');
+        console.log('[GmailSync] 1. Go to https://console.cloud.google.com');
+        console.log('[GmailSync] 2. Create a new project or select existing');
+        console.log('[GmailSync] 3. Enable Gmail API');
+        console.log('[GmailSync] 4. Create OAuth 2.0 credentials (Web application type)');
+        console.log('[GmailSync] 5. Add redirect URI:', this.redirectUri);
+        console.log('[GmailSync] 6. Set EXPO_PUBLIC_GOOGLE_CLIENT_ID in your .env file');
+        return false;
+      }
+
+      // Create auth request
+      const request = new AuthSession.AuthRequest({
+        clientId: this.clientId,
+        scopes: this.scopes,
+        responseType: AuthSession.ResponseType.Code,
+        redirectUri: this.redirectUri,
+        usePKCE: true, // Use PKCE for enhanced security
+        prompt: AuthSession.Prompt.SelectAccount,
+        extraParams: {
+          access_type: 'offline', // Request refresh token
+        },
+      });
+
+      // Initiate authentication
+      const result = await request.promptAsync(this.discovery);
       
-      console.warn('[GmailSync] Using demo mode - Gmail sync requires proper Google OAuth setup');
-      console.warn('[GmailSync] To enable Gmail sync:');
-      console.warn('[GmailSync] 1. Go to https://console.cloud.google.com');
-      console.warn('[GmailSync] 2. Create a new project or select existing');
-      console.warn('[GmailSync] 3. Enable Gmail API');
-      console.warn('[GmailSync] 4. Create OAuth 2.0 credentials');
-      console.warn('[GmailSync] 5. Add your redirect URI');
-      console.warn('[GmailSync] 6. Replace clientId in GmailSync.ts');
+      console.log('[GmailSync] Auth result type:', result.type);
       
-      // Simulate authentication failure for now
+      if (result.type === 'success') {
+        const { code } = result.params;
+        
+        // Exchange authorization code for tokens
+        const tokenResult = await AuthSession.exchangeCodeAsync(
+          {
+            clientId: this.clientId,
+            code,
+            redirectUri: this.redirectUri,
+            extraParams: {
+              code_verifier: request.codeVerifier || '',
+            },
+          },
+          this.discovery
+        );
+        
+        if (tokenResult.accessToken) {
+          // Store tokens securely
+          await this.storeTokens(
+            tokenResult.accessToken,
+            tokenResult.refreshToken || ''
+          );
+          
+          console.log('[GmailSync] Authentication successful');
+          return true;
+        }
+      } else if (result.type === 'cancel') {
+        console.log('[GmailSync] Authentication cancelled by user');
+      } else if (result.type === 'dismiss') {
+        console.log('[GmailSync] Authentication dismissed');
+      } else if (result.type === 'error') {
+        console.error('[GmailSync] Authentication error:', result.error);
+      }
+      
       return false;
     } catch (error) {
       console.error('[GmailSync] Authentication failed:', error);
@@ -170,31 +239,35 @@ export class GmailSync {
     try {
       const { refreshToken } = await this.getStoredTokens();
       if (!refreshToken) {
-        throw new Error('No refresh token available');
+        console.log('[GmailSync] No refresh token available, need to re-authenticate');
+        return null;
       }
 
-      const response = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          client_id: this.clientId,
-          refresh_token: refreshToken,
-          grant_type: 'refresh_token',
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Token refresh failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-      await this.storeTokens(data.access_token, refreshToken);
+      console.log('[GmailSync] Refreshing access token...');
       
-      return data.access_token;
+      const tokenResult = await AuthSession.refreshAsync(
+        {
+          clientId: this.clientId,
+          refreshToken,
+        },
+        this.discovery
+      );
+      
+      if (tokenResult.accessToken) {
+        await this.storeTokens(
+          tokenResult.accessToken,
+          tokenResult.refreshToken || refreshToken
+        );
+        
+        console.log('[GmailSync] Token refreshed successfully');
+        return tokenResult.accessToken;
+      }
+      
+      throw new Error('Failed to refresh token');
     } catch (error) {
       console.error('[GmailSync] Failed to refresh token:', error);
+      // Clear invalid tokens
+      await this.signOut();
       return null;
     }
   }
