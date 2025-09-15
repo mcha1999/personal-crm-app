@@ -12,12 +12,30 @@ import {
 } from 'react-native';
 import { ExternalLink, Copy, CheckCircle, AlertCircle, ChevronRight } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
-import * as AuthSession from 'expo-auth-session';
+import { ENABLE_GOOGLE_OAUTH } from '../src/flags';
+
+let AuthSession: any;
+if (ENABLE_GOOGLE_OAUTH) {
+  AuthSession = require('expo-auth-session');
+}
 
 export function GmailSetupGuide() {
   const [clientId, setClientId] = useState('');
   const [isValidClientId, setIsValidClientId] = useState(false);
-  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'kin-app' });
+  const redirectUri = ENABLE_GOOGLE_OAUTH ? AuthSession.makeRedirectUri({ scheme: 'kin-app' }) : 'Feature disabled';
+
+  if (!ENABLE_GOOGLE_OAUTH) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Gmail Integration Disabled</Text>
+          <Text style={styles.subtitle}>
+            Gmail integration is currently disabled in this build.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   const validateClientId = (id: string) => {
     setClientId(id);

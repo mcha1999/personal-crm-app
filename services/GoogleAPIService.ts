@@ -1,7 +1,6 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { GmailSync } from './GmailSync';
-
+import { ENABLE_GOOGLE_OAUTH } from '../src/flags';
 
 /**
  * GoogleAPIService - Device-Only Architecture
@@ -48,9 +47,15 @@ export class GoogleAPIService {
    * - Tokens stored in device secure storage only
    */
   async authenticate(): Promise<boolean> {
+    if (!ENABLE_GOOGLE_OAUTH) {
+      console.log('[GoogleAPI] Google OAuth is disabled');
+      return false;
+    }
+
     try {
       console.log('[GoogleAPI] Starting device-only OAuth authentication...');
       
+      const { GmailSync } = await import('./GmailSync');
       const gmailSync = GmailSync.getInstance();
       const success = await gmailSync.authenticate();
       
@@ -136,9 +141,15 @@ export class GoogleAPIService {
    * - Extracts interaction data for local storage
    */
   async fetchGmailMessages(maxResults: number = 50): Promise<any[]> {
+    if (!ENABLE_GOOGLE_OAUTH) {
+      console.log('[GoogleAPI] Google OAuth is disabled');
+      return [];
+    }
+
     console.log('[GoogleAPI] Fetching Gmail messages (device-only processing)...');
     
     try {
+      const { GmailSync } = await import('./GmailSync');
       const gmailSync = GmailSync.getInstance();
       const isAuthenticated = await gmailSync.isAuthenticated();
       
@@ -259,7 +270,12 @@ export class GoogleAPIService {
    * Check Authentication Status
    */
   async isAuthenticated(): Promise<boolean> {
+    if (!ENABLE_GOOGLE_OAUTH) {
+      return false;
+    }
+
     try {
+      const { GmailSync } = await import('./GmailSync');
       const gmailSync = GmailSync.getInstance();
       return await gmailSync.isAuthenticated();
     } catch (error) {
@@ -277,7 +293,13 @@ export class GoogleAPIService {
    * - Complete local cleanup
    */
   async signOut(): Promise<void> {
+    if (!ENABLE_GOOGLE_OAUTH) {
+      console.log('[GoogleAPI] Google OAuth is disabled');
+      return;
+    }
+
     try {
+      const { GmailSync } = await import('./GmailSync');
       const gmailSync = GmailSync.getInstance();
       await gmailSync.signOut();
       
@@ -300,7 +322,13 @@ export class GoogleAPIService {
    * Sync Gmail Data - Initial or Delta
    */
   async syncGmail(maxResults?: number): Promise<{ threads: any[]; messages: any[]; interactions: any[] }> {
+    if (!ENABLE_GOOGLE_OAUTH) {
+      console.log('[GoogleAPI] Google OAuth is disabled');
+      return { threads: [], messages: [], interactions: [] };
+    }
+
     try {
+      const { GmailSync } = await import('./GmailSync');
       const gmailSync = GmailSync.getInstance();
       const isAuthenticated = await gmailSync.isAuthenticated();
       

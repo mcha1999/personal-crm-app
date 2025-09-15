@@ -1,13 +1,22 @@
 import { Platform } from 'react-native';
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
-import * as SecureStore from 'expo-secure-store';
+import { ENABLE_GOOGLE_OAUTH } from '../src/flags';
 import { Thread } from '@/models/Thread';
 import { Message } from '@/models/Message';
 import { Interaction } from '@/models/Interaction';
 
-// Ensure web browser sessions complete properly
-WebBrowser.maybeCompleteAuthSession();
+let AuthSession: any;
+let WebBrowser: any;
+let SecureStore: any;
+
+if (ENABLE_GOOGLE_OAUTH) {
+  // Only import when feature is enabled
+  AuthSession = require('expo-auth-session');
+  WebBrowser = require('expo-web-browser');
+  SecureStore = require('expo-secure-store');
+  
+  // Ensure web browser sessions complete properly
+  WebBrowser.maybeCompleteAuthSession();
+}
 
 
 interface GmailMessage {
@@ -75,6 +84,11 @@ export class GmailSync {
   private readonly baseUrl = 'https://gmail.googleapis.com/gmail/v1';
   
   private constructor() {
+    if (!ENABLE_GOOGLE_OAUTH) {
+      console.log('[GmailSync] Google OAuth is disabled');
+      return;
+    }
+
     // Generate redirect URI for OAuth
     // For Expo Go: uses auth.expo.io proxy
     // For standalone apps: uses your app's custom scheme
@@ -100,11 +114,16 @@ export class GmailSync {
    * - Tokens stored in device secure storage only
    */
   async authenticate(): Promise<boolean> {
+    if (!ENABLE_GOOGLE_OAUTH) {
+      console.log('[GmailSync] Google OAuth is disabled');
+      return false;
+    }
+
     try {
       console.log('[GmailSync] Starting OAuth 2.0 authentication...');
       
       // Check if we have a valid client ID
-      if (this.clientId === 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com' || !this.clientId.includes('.apps.googleusercontent.com')) {
+      if (this.clientId === 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com' || !(this.clientId as string).includes('.apps.googleusercontent.com')) {
         console.error('[GmailSync] Invalid Google Client ID. Please configure your OAuth credentials.');
         console.log('[GmailSync] To enable Gmail sync:');
         console.log('[GmailSync] 1. Go to https://console.cloud.google.com');
@@ -329,6 +348,11 @@ export class GmailSync {
    * - Stores results in local SQLite database
    */
   async seed(maxResults: number = 100): Promise<{ threads: Thread[]; messages: Message[]; interactions: Interaction[] }> {
+    if (!ENABLE_GOOGLE_OAUTH) {
+      console.log('[GmailSync] Google OAuth is disabled');
+      return { threads: [], messages: [], interactions: [] };
+    }
+
     try {
       console.log('[GmailSync] Starting initial Gmail sync (seed)...');
       
@@ -387,6 +411,11 @@ export class GmailSync {
    * - Handles 404 errors by falling back to full reseed
    */
   async delta(): Promise<{ threads: Thread[]; messages: Message[]; interactions: Interaction[] }> {
+    if (!ENABLE_GOOGLE_OAUTH) {
+      console.log('[GmailSync] Google OAuth is disabled');
+      return { threads: [], messages: [], interactions: [] };
+    }
+
     try {
       console.log('[GmailSync] Starting delta Gmail sync...');
       
@@ -615,6 +644,10 @@ export class GmailSync {
    * Check if authenticated
    */
   async isAuthenticated(): Promise<boolean> {
+    if (!ENABLE_GOOGLE_OAUTH) {
+      return false;
+    }
+
     const { accessToken } = await this.getStoredTokens();
     return accessToken !== null;
   }
@@ -623,6 +656,11 @@ export class GmailSync {
    * Sign out - Remove tokens
    */
   async signOut(): Promise<void> {
+    if (!ENABLE_GOOGLE_OAUTH) {
+      console.log('[GmailSync] Google OAuth is disabled');
+      return;
+    }
+
     try {
       if (Platform.OS !== 'web') {
         await SecureStore.deleteItemAsync('gmail_access_token');

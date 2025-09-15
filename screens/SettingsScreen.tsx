@@ -4,7 +4,12 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield, Upload, FileText, Users, Calendar as CalendarIcon, Mail, Calculator, Cpu } from 'lucide-react-native';
 import { BackgroundTaskManager } from '../services/BackgroundTaskManager';
-import { GoogleAPIService } from '../services/GoogleAPIService';
+import { ENABLE_GOOGLE_OAUTH } from '../src/flags';
+
+let GoogleAPIService: any;
+if (ENABLE_GOOGLE_OAUTH) {
+  GoogleAPIService = require('../services/GoogleAPIService').GoogleAPIService;
+}
 import { LocalExport } from '../database/LocalExport';
 import { Database } from '../database/Database';
 import { PRIVACY_CONFIG, PRIVACY_SCOPES, PRIVACY_GUARANTEES } from '../constants/privacy';
@@ -65,6 +70,12 @@ export const SettingsScreen: React.FC = () => {
 
     // Check Google API authentication status
     const checkGoogleAuth = async () => {
+      if (!ENABLE_GOOGLE_OAUTH) {
+        setIsGoogleAuthenticated(false);
+        setGoogleAPIEnabled(false);
+        return;
+      }
+
       const googleAPI = GoogleAPIService.getInstance();
       const authenticated = await googleAPI.isAuthenticated();
       setIsGoogleAuthenticated(authenticated);
@@ -131,6 +142,11 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const handleGoogleAPIToggle = async (enabled: boolean) => {
+    if (!ENABLE_GOOGLE_OAUTH) {
+      Alert.alert('Feature Disabled', 'Google OAuth integration is disabled in this build.');
+      return;
+    }
+
     if (enabled) {
       // Enable Google API - authenticate
       const googleAPI = GoogleAPIService.getInstance();
@@ -470,35 +486,35 @@ export const SettingsScreen: React.FC = () => {
           icon: <Shield size={20} color="#27AE60" />,
           label: 'Privacy Information',
           subtitle: 'Device-only architecture - no data transmission',
-          type: 'action',
+          type: 'action' as const,
           onPress: showPrivacyInfo,
         },
         {
           icon: <Download size={20} color="#27AE60" />,
           label: 'Export to Files',
           subtitle: 'Export all data to Files app',
-          type: 'action',
+          type: 'action' as const,
           onPress: handleExport,
         },
         {
           icon: <Upload size={20} color="#3498DB" />,
           label: 'Import from Files',
           subtitle: 'Import data from Files app',
-          type: 'action',
+          type: 'action' as const,
           onPress: handleImport,
         },
         {
           icon: <Users size={20} color={isImporting ? "#F39C12" : "#27AE60"} />,
           label: 'Import contacts now',
           subtitle: getContactsImportSubtitle(),
-          type: 'action',
+          type: 'action' as const,
           onPress: handleImportContacts,
         },
         {
           icon: <CalendarIcon size={20} color={isCalendarImporting ? "#F39C12" : "#3498DB"} />,
           label: 'Import calendar now',
           subtitle: getCalendarImportSubtitle(),
-          type: 'action',
+          type: 'action' as const,
           onPress: handleImportCalendar,
           loading: isCalendarImporting,
         },
@@ -507,19 +523,19 @@ export const SettingsScreen: React.FC = () => {
           icon: <RefreshCw size={20} color="#E74C3C" />,
           label: 'Reset Database',
           subtitle: 'Clear all data and start fresh',
-          type: 'action',
+          type: 'action' as const,
           onPress: handleResetDatabase,
         },
       ],
     },
-    {
+    ...(ENABLE_GOOGLE_OAUTH ? [{
       title: 'Google API Integration (Optional)',
       items: [
         {
           icon: <RefreshCw size={20} color={googleAPIEnabled ? "#007AFF" : "#95A5A6"} />,
           label: 'Enable Google Sync',
           subtitle: googleAPIEnabled ? 'Enabled (device-only processing)' : 'Disabled',
-          type: 'switch',
+          type: 'switch' as const,
           value: googleAPIEnabled,
           onValueChange: handleGoogleAPIToggle,
         },
@@ -527,46 +543,46 @@ export const SettingsScreen: React.FC = () => {
           icon: <Info size={20} color={googleAPIEnabled ? "#3498DB" : "#95A5A6"} />,
           label: 'API Scopes & Permissions',
           subtitle: googleAPIEnabled ? 'View required permissions' : 'Enable Google API first',
-          type: 'action',
+          type: 'action' as const,
           onPress: googleAPIEnabled ? showGoogleScopeInfo : () => {},
         },
         {
           icon: <RefreshCw size={20} color={taskStatus?.gmailSync?.isRegistered ? "#007AFF" : "#95A5A6"} />,
           label: 'Manual Gmail Sync',
           subtitle: taskStatus ? `Last: ${taskStatus.gmailSync.lastRun ? formatLastRunTime(taskStatus.gmailSync.lastRun) : 'Never'} • Next: ${formatNextRunTime(taskStatus.gmailSync.nextRun)}` : 'Loading...',
-          type: 'action',
+          type: 'action' as const,
           onPress: handleManualSync,
         },
         {
           icon: <Brain size={20} color="#9B59B6" />,
           label: 'Manual Index & Score',
           subtitle: taskStatus ? `Last: ${taskStatus.indexScore.lastRun ? formatLastRunTime(taskStatus.indexScore.lastRun) : 'Never'} • Next: ${formatNextRunTime(taskStatus.indexScore.nextRun)}` : 'Loading...',
-          type: 'action',
+          type: 'action' as const,
           onPress: handleManualScore,
         },
       ],
-    },
+    }] : [] as SettingSection[]),
     {
       title: 'Preferences',
       items: [
         {
           icon: <Bell size={20} color="#45B7D1" />,
           label: 'Notifications',
-          type: 'switch',
+          type: 'switch' as const,
           value: notifications,
           onValueChange: setNotifications,
         },
         {
           icon: <Bell size={20} color="#4ECDC4" />,
           label: 'Birthday Reminders',
-          type: 'switch',
+          type: 'switch' as const,
           value: reminders,
           onValueChange: setReminders,
         },
         {
           icon: <Palette size={20} color="#FF6B6B" />,
           label: 'Appearance',
-          type: 'navigation',
+          type: 'navigation' as const,
         },
       ],
     },
@@ -577,7 +593,7 @@ export const SettingsScreen: React.FC = () => {
           icon: <Lock size={20} color={isAuthEnabled ? "#27AE60" : "#95A5A6"} />,
           label: 'App Lock',
           subtitle: getAuthTypeLabel(),
-          type: 'switch',
+          type: 'switch' as const,
           value: isAuthEnabled,
           onValueChange: handleAuthToggle,
         },
@@ -590,7 +606,7 @@ export const SettingsScreen: React.FC = () => {
           icon: <Cpu size={20} color="#9B59B6" />,
           label: 'AI Service Demo',
           subtitle: 'Test thread summary, follow-up detection, and prep pack generation',
-          type: 'action',
+          type: 'action' as const,
           onPress: () => router.push('/ai-demo'),
         },
       ],
@@ -602,7 +618,7 @@ export const SettingsScreen: React.FC = () => {
           icon: <Shield size={20} color="#3498DB" />,
           label: 'App Permissions',
           subtitle: 'Manage privacy settings and permissions',
-          type: 'action',
+          type: 'action' as const,
           onPress: () => router.push('/permissions'),
         },
       ],
@@ -613,12 +629,12 @@ export const SettingsScreen: React.FC = () => {
         {
           icon: <HelpCircle size={20} color="#F39C12" />,
           label: 'Help & Support',
-          type: 'navigation',
+          type: 'navigation' as const,
         },
         {
           icon: <Info size={20} color="#3498DB" />,
           label: 'About',
-          type: 'navigation',
+          type: 'navigation' as const,
         },
       ],
     },
