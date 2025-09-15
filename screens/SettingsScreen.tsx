@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
+import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield, Upload, FileText } from 'lucide-react-native';
 import { BackgroundTaskManager } from '../services/BackgroundTaskManager';
@@ -344,22 +345,11 @@ export const SettingsScreen: React.FC = () => {
       title: 'Permissions',
       items: [
         {
-          icon: <Camera size={20} color="#3498DB" />,
-          label: 'Camera',
-          subtitle: 'Allowed',
-          type: 'navigation',
-        },
-        {
-          icon: <MapPin size={20} color="#E67E22" />,
-          label: 'Location',
-          subtitle: 'While Using App',
-          type: 'navigation',
-        },
-        {
-          icon: <Bell size={20} color="#45B7D1" />,
-          label: 'Notifications',
-          subtitle: 'Enabled',
-          type: 'navigation',
+          icon: <Shield size={20} color="#3498DB" />,
+          label: 'App Permissions',
+          subtitle: 'Manage privacy settings and permissions',
+          type: 'action',
+          onPress: () => router.push('/permissions'),
         },
       ],
     },
