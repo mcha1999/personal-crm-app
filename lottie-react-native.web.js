@@ -4,16 +4,18 @@
 import React from 'react';
 import { View } from 'react-native';
 
-// Mock the dotlottie-react module that lottie-react-native tries to import
-export const DotLottieReact = () => null;
-
 // Main LottieView component for web
-export default function LottieView(props) {
+function LottieView(props) {
   // Return an empty view on web as lottie animations are not supported
-  return React.createElement(View, props);
+  return React.createElement(View, {
+    style: props.style,
+    testID: props.testID,
+  });
 }
 
-export const AnimatedLottieView = LottieView;
+// Export default
+export default LottieView;
 
-// Export all the expected exports from lottie-react-native
-export const LottieViewWeb = LottieView;
+// Named exports that lottie-react-native provides
+export { LottieView };
+export const AnimatedLottieView = LottieView;
