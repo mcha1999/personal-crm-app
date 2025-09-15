@@ -14,7 +14,7 @@ export interface SyncPreferences {
   calendarEnabled: boolean;
   calendarSource: 'eventkit' | 'google' | null;
   emailEnabled: boolean;
-  emailMethod: 'manual' | 'shortcuts' | 'forward' | null;
+  emailMethod: 'manual' | 'shortcuts' | 'forward' | 'imap' | null;
   syncWindowDays: number;
   gmailAccessToken?: string;
   gmailRefreshToken?: string;
@@ -234,7 +234,7 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
     }
   }, [completeStep, setStepInProgress, setStepError]);
 
-  const setEmailMethod = useCallback(async (method: 'manual' | 'shortcuts' | 'forward'): Promise<void> => {
+  const setEmailMethod = useCallback(async (method: 'manual' | 'shortcuts' | 'forward' | 'imap'): Promise<void> => {
     try {
       console.log('[Onboarding] Setting email method to:', method);
       

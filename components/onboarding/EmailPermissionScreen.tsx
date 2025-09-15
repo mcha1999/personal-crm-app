@@ -7,8 +7,9 @@ import {
   SafeAreaView,
   ScrollView,
 } from 'react-native';
-import { Mail, CheckCircle, AlertCircle, Forward, Zap } from 'lucide-react-native';
+import { Mail, CheckCircle, Zap, Server } from 'lucide-react-native';
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { router } from 'expo-router';
 
 export function EmailPermissionScreen() {
   const { setEmailMethod, steps } = useOnboarding();
@@ -19,12 +20,20 @@ export function EmailPermissionScreen() {
 
   const emailMethods = [
     {
+      id: 'imap',
+      title: 'IMAP Connection',
+      description: 'Connect your email account using App Passwords',
+      icon: Server,
+      details: 'Secure on-device email analysis using IMAP with App Passwords for Gmail, Outlook, iCloud',
+      recommended: true,
+      hasSetup: true,
+    },
+    {
       id: 'manual',
       title: 'Manual Logging',
       description: 'Manually log important email interactions',
       icon: Mail,
       details: 'Quick and private - log emails when they matter for relationship tracking',
-      recommended: true,
     },
     {
       id: 'shortcuts',
@@ -34,22 +43,19 @@ export function EmailPermissionScreen() {
       details: 'Set up shortcuts to automatically capture email metadata on-device',
       comingSoon: true,
     },
-    {
-      id: 'forward',
-      title: 'Email Forwarding',
-      description: 'Forward important emails to track interactions',
-      icon: Forward,
-      details: 'Forward or BCC emails to a special address for processing',
-      comingSoon: true,
-    },
   ];
 
   const handleMethodSelect = (methodId: string) => {
     setSelectedMethod(methodId);
+    
+    // If IMAP is selected, navigate to setup immediately
+    if (methodId === 'imap') {
+      router.push('/email-setup');
+    }
   };
 
   const handleContinue = async () => {
-    if (selectedMethod && (selectedMethod === 'manual' || selectedMethod === 'shortcuts' || selectedMethod === 'forward')) {
+    if (selectedMethod && (selectedMethod === 'manual' || selectedMethod === 'shortcuts' || selectedMethod === 'imap')) {
       await setEmailMethod(selectedMethod);
     }
   };
@@ -80,18 +86,18 @@ export function EmailPermissionScreen() {
         </View>
 
         <View style={styles.explanation}>
-          <Text style={styles.explanationTitle}>Privacy-First Email Tracking</Text>
+          <Text style={styles.explanationTitle}>On-Device Email Intelligence</Text>
           <Text style={styles.explanationText}>
-            Unlike cloud-based solutions, Kin processes your email data entirely on your device using Apple Intelligence and local ML.
+            Connect your email account using secure App Passwords for on-device analysis. All processing happens locally using Apple Intelligence and local ML - no data leaves your device.
           </Text>
         </View>
 
         <View style={styles.privacyCard}>
-          <AlertCircle size={20} color="#FF9500" />
+          <CheckCircle size={20} color="#34C759" />
           <View style={styles.privacyContent}>
-            <Text style={styles.privacyTitle}>Important: iOS Email Limitations</Text>
+            <Text style={styles.privacyTitle}>Secure App Password Authentication</Text>
             <Text style={styles.privacyText}>
-              iOS doesn&apos;t allow direct access to Mail.app data. We offer privacy-focused alternatives that work entirely on your device.
+              Use App Passwords (not your main password) to securely connect Gmail, Outlook, iCloud, or any IMAP provider. All email analysis happens on your device.
             </Text>
           </View>
         </View>
@@ -170,22 +176,24 @@ export function EmailPermissionScreen() {
       <View style={styles.footer}>
         {!isCompleted && (
           <>
-            <TouchableOpacity 
-              style={[
-                styles.primaryButton,
-                !selectedMethod && styles.buttonDisabled,
-              ]} 
-              onPress={handleContinue}
-              disabled={!selectedMethod}
-            >
-              <Text style={styles.primaryButtonText}>Continue</Text>
-            </TouchableOpacity>
+            {selectedMethod !== 'imap' && (
+              <TouchableOpacity 
+                style={[
+                  styles.primaryButton,
+                  !selectedMethod && styles.buttonDisabled,
+                ]} 
+                onPress={handleContinue}
+                disabled={!selectedMethod}
+              >
+                <Text style={styles.primaryButtonText}>Continue</Text>
+              </TouchableOpacity>
+            )}
             
             <TouchableOpacity 
               style={styles.secondaryButton} 
               onPress={handleSkip}
             >
-              <Text style={styles.secondaryButtonText}>Skip Email Tracking</Text>
+              <Text style={styles.secondaryButtonText}>Skip for now</Text>
             </TouchableOpacity>
           </>
         )}
@@ -259,12 +267,12 @@ const styles = StyleSheet.create({
   },
   privacyCard: {
     flexDirection: 'row',
-    backgroundColor: '#FFF9E6',
+    backgroundColor: '#E8F5E8',
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#FFE066',
+    borderColor: '#B8E6B8',
   },
   privacyContent: {
     flex: 1,
