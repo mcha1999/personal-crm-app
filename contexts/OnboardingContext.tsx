@@ -298,15 +298,47 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
       await AsyncStorage.removeItem(ONBOARDING_COMPLETED_KEY);
       await AsyncStorage.removeItem(SYNC_PREFERENCES_KEY);
       
+      // Reset all state immediately
       setIsOnboardingCompleted(false);
       setSyncPreferences(defaultSyncPreferences);
       setCurrentStep(0);
-      setSteps(prev => prev.map(step => ({ 
-        ...step, 
-        completed: false, 
-        inProgress: false, 
-        error: undefined 
-      })));
+      setSteps([
+        {
+          id: 'privacy',
+          title: 'Privacy First',
+          description: 'Learn about our device-only approach to your data',
+          completed: false,
+          inProgress: false,
+        },
+        {
+          id: 'contacts',
+          title: 'Contacts Access',
+          description: 'Allow access to your contacts for relationship tracking',
+          completed: false,
+          inProgress: false,
+        },
+        {
+          id: 'calendar',
+          title: 'Calendar Integration',
+          description: 'Choose your calendar source for meeting insights',
+          completed: false,
+          inProgress: false,
+        },
+        {
+          id: 'email',
+          title: 'Email Intelligence',
+          description: 'Choose how to track email interactions',
+          completed: false,
+          inProgress: false,
+        },
+        {
+          id: 'sync-window',
+          title: 'Sync Settings',
+          description: 'Configure how much data to sync initially',
+          completed: false,
+          inProgress: false,
+        },
+      ]);
       
       console.log('[Onboarding] Onboarding reset successfully');
     } catch (error) {

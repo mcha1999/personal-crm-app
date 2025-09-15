@@ -280,7 +280,7 @@ export const SettingsScreen: React.FC = () => {
   const handleResetOnboarding = async () => {
     Alert.alert(
       'Reset Onboarding',
-      'This will show the welcome flow again when you restart the app.',
+      'This will immediately show the welcome flow again.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -289,7 +289,8 @@ export const SettingsScreen: React.FC = () => {
           onPress: async () => {
             try {
               await resetOnboarding();
-              Alert.alert('Success', 'Onboarding has been reset. Please restart the app to see the welcome flow.');
+              // The onboarding flow will appear immediately due to state change
+              console.log('[Settings] Onboarding reset successfully - flow will appear immediately');
             } catch (error) {
               console.error('Reset onboarding error:', error);
               Alert.alert('Reset Failed', 'Could not reset onboarding');
