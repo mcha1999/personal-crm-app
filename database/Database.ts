@@ -8,6 +8,7 @@ export class Database {
   private db: SQLite.SQLiteDatabase | null = null;
   private isWebPlatform = Platform.OS === 'web';
   private encryptionKey: string | null = null;
+  private readonly CURRENT_VERSION = 2;
 
   private constructor() {}
 
@@ -25,6 +26,7 @@ export class Database {
       if (!this.isWebPlatform) {
         await this.initializeEncryption();
         this.db = await SQLite.openDatabaseAsync('kin.db');
+        await this.runMigrations();
         await this.createTables();
         await this.seedInitialData();
       }
@@ -80,6 +82,63 @@ export class Database {
 
   getEncryptionKey(): string | null {
     return this.encryptionKey;
+  }
+
+  private async runMigrations(): Promise<void> {
+    if (!this.db || this.isWebPlatform) return;
+
+    // Get current version
+    let currentVersion = 0;
+    try {
+      const result = await this.db.getFirstAsync<{ user_version: number }>(
+        'PRAGMA user_version'
+      );
+      currentVersion = result?.user_version || 0;
+    } catch (error) {
+      console.log('Getting user_version failed, assuming 0');
+      currentVersion = 0;
+    }
+
+    console.log(`Database version: ${currentVersion}, target version: ${this.CURRENT_VERSION}`);
+
+    // Run migrations
+    if (currentVersion < 1) {
+      // Initial schema - handled by createTables
+      console.log('Running migration 0 -> 1');
+    }
+
+    if (currentVersion < 2) {
+      console.log('Running migration 1 -> 2: Adding normalizedName to places');
+      try {
+        // Check if column already exists
+        const tableInfo = await this.db.getAllAsync(
+          "PRAGMA table_info(places)"
+        );
+        const hasNormalizedName = tableInfo.some((col: any) => col.name === 'normalizedName');
+        
+        if (!hasNormalizedName) {
+          // Add the normalizedName column
+          await this.db.execAsync(`
+            ALTER TABLE places ADD COLUMN normalizedName TEXT;
+          `);
+          
+          // Update existing rows with normalized names
+          await this.db.execAsync(`
+            UPDATE places 
+            SET normalizedName = LOWER(TRIM(REPLACE(REPLACE(REPLACE(name, '  ', ' '), '\n', ' '), '\r', ' ')))
+            WHERE normalizedName IS NULL;
+          `);
+        }
+      } catch (error) {
+        console.log('Migration 1 -> 2 error (may be already applied):', error);
+      }
+    }
+
+    // Update version
+    if (currentVersion < this.CURRENT_VERSION) {
+      await this.db.execAsync(`PRAGMA user_version = ${this.CURRENT_VERSION}`);
+      console.log(`Database migrated to version ${this.CURRENT_VERSION}`);
+    }
   }
 
   private async createTables(): Promise<void> {

@@ -6,6 +6,7 @@ import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw,
 import { BackgroundTaskManager } from '../services/BackgroundTaskManager';
 import { GoogleAPIService } from '../services/GoogleAPIService';
 import { LocalExport } from '../database/LocalExport';
+import { Database } from '../database/Database';
 import { PRIVACY_CONFIG, PRIVACY_SCOPES, PRIVACY_GUARANTEES } from '../constants/privacy';
 import { useAuth } from '@/contexts/AuthContext';
 import { useContacts } from '@/contexts/ContactsContext';
@@ -242,6 +243,37 @@ export const SettingsScreen: React.FC = () => {
             } catch (error) {
               console.error('Import error:', error);
               Alert.alert('Import Failed', 'Could not import data');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleResetDatabase = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Not Available', 'Database reset is not available on web platform');
+      return;
+    }
+    
+    Alert.alert(
+      'Reset Database',
+      'This will delete all data and recreate the database. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const db = Database.getInstance();
+              await db.close();
+              await db.init();
+              
+              Alert.alert('Success', 'Database has been reset. Please restart the app for changes to take effect.');
+            } catch (error) {
+              console.error('Reset error:', error);
+              Alert.alert('Reset Failed', 'Could not reset database');
             }
           }
         }
@@ -513,6 +545,13 @@ export const SettingsScreen: React.FC = () => {
           type: 'action' as const,
           onPress: handleGmailSignOut,
         }] : []),
+        {
+          icon: <RefreshCw size={20} color="#E74C3C" />,
+          label: 'Reset Database',
+          subtitle: 'Clear all data and start fresh',
+          type: 'action',
+          onPress: handleResetDatabase,
+        },
       ],
     },
     {

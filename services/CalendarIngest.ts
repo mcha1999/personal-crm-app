@@ -164,19 +164,9 @@ export class CalendarIngest {
       );
 
       if (!place) {
-        // Create new place based on Place model
-        const newPlace: Omit<Place, 'id' | 'createdAt' | 'updatedAt'> = {
-          name: sanitizedLocation,
-          address: sanitizedLocation,
-          latitude: 0,
-          longitude: 0,
-          category: 'other' as const,
-          notes: undefined
-        };
-        
-        const createdPlace = await this.placeDAO.create(newPlace);
-        place = createdPlace;
-        console.log(`Created new place: ${sanitizedLocation}`);
+        // Use findOrCreateByNormalizedName which handles normalization properly
+        place = await this.placeDAO.findOrCreateByNormalizedName(sanitizedLocation, 'other');
+        console.log(`Created or found place: ${sanitizedLocation}`);
       }
 
       // Link meeting to place using the addPlace method
