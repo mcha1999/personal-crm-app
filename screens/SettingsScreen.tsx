@@ -2,12 +2,13 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield, Upload, FileText } from 'lucide-react-native';
+import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield, Upload, FileText, Users } from 'lucide-react-native';
 import { BackgroundTaskManager } from '../services/BackgroundTaskManager';
 import { GoogleAPIService } from '../services/GoogleAPIService';
 import { LocalExport } from '../database/LocalExport';
 import { PRIVACY_CONFIG, PRIVACY_SCOPES, PRIVACY_GUARANTEES } from '../constants/privacy';
 import { useAuth } from '@/contexts/AuthContext';
+import { useContacts } from '@/contexts/ContactsContext';
 import * as LocalAuthentication from 'expo-local-authentication';
 
 type SettingItem = 
@@ -30,6 +31,7 @@ export const SettingsScreen: React.FC = () => {
   const [supportedAuthTypes, setSupportedAuthTypes] = React.useState<LocalAuthentication.AuthenticationType[]>([]);
   
   const { isAuthEnabled, enableAuth, disableAuth, getSupportedAuthTypes } = useAuth();
+  const { isImporting, lastImportResult, lastImportDate, error: contactsError, importContacts, clearError } = useContacts();
 
   useEffect(() => {
     const taskManager = BackgroundTaskManager.getInstance();
@@ -183,6 +185,36 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
+  const handleImportContacts = async () => {
+    if (isImporting) return;
+    
+    try {
+      clearError();
+      const result = await importContacts();
+      if (result) {
+        Alert.alert(
+          'Contacts Import Complete',
+          `Imported: ${result.imported}\nUpdated: ${result.updated}\nSkipped: ${result.skipped}`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to import contacts';
+      Alert.alert('Import Failed', message);
+    }
+  };
+
+  const getContactsImportSubtitle = (): string => {
+    if (isImporting) return 'Importing contacts...';
+    if (contactsError) return `Error: ${contactsError}`;
+    if (lastImportResult && lastImportDate) {
+      const timeAgo = Math.floor((Date.now() - lastImportDate.getTime()) / (1000 * 60));
+      const timeStr = timeAgo < 60 ? `${timeAgo}m ago` : `${Math.floor(timeAgo / 60)}h ago`;
+      return `Last: ${lastImportResult.imported + lastImportResult.updated} contacts (${timeStr})`;
+    }
+    return 'Import contacts from device';
+  };
+
   const handleAuthToggle = async (enabled: boolean) => {
     if (Platform.OS === 'web') {
       Alert.alert('Not Available', 'Biometric authentication is not available on web');
@@ -267,6 +299,13 @@ export const SettingsScreen: React.FC = () => {
           subtitle: 'Import data from Files app',
           type: 'action',
           onPress: handleImport,
+        },
+        {
+          icon: <Users size={20} color={isImporting ? "#F39C12" : "#27AE60"} />,
+          label: 'Import contacts now',
+          subtitle: getContactsImportSubtitle(),
+          type: 'action',
+          onPress: handleImportContacts,
         },
       ],
     },

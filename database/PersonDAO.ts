@@ -211,4 +211,8 @@ export class PersonDAO extends BaseDAO<PersonDB> {
     );
     return result ? this.dbToPerson(result) : null;
   }
+
+  async getAll(): Promise<Person[]> {
+    return this.getAllPersons();
+  }
 }

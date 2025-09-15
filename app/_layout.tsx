@@ -5,6 +5,7 @@ import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { DatabaseProvider, useDatabase } from "@/contexts/DatabaseContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ContactsContext } from "@/contexts/ContactsContext";
 import { AuthScreen } from "@/components/AuthScreen";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 
@@ -62,9 +63,11 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <DatabaseProvider>
-          <GestureHandlerRootView style={styles.rootView}>
-            <AppContent />
-          </GestureHandlerRootView>
+          <ContactsContext>
+            <GestureHandlerRootView style={styles.rootView}>
+              <AppContent />
+            </GestureHandlerRootView>
+          </ContactsContext>
         </DatabaseProvider>
       </AuthProvider>
     </QueryClientProvider>
