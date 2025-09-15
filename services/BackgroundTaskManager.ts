@@ -244,7 +244,13 @@ export class BackgroundTaskManager {
       await this.initializeBackgroundTasks();
 
       // Check if background fetch is available
-      const status = await BackgroundFetch.getStatusAsync();
+      let status;
+      try {
+        status = await BackgroundFetch.getStatusAsync();
+      } catch (error) {
+        console.log('[BackgroundTask] Background fetch not available in this environment (Expo Go)');
+        return;
+      }
       
       if (status === BackgroundFetch.BackgroundFetchStatus.Restricted) {
         console.warn('[BackgroundTask] Background fetch is restricted by the system');
@@ -348,10 +354,11 @@ export class BackgroundTaskManager {
         console.log('[BackgroundTask] Index & Score scheduled (local processing, every 24 hours)');
       }
       if (!gmailRegistered && !scoreRegistered) {
-        console.log('[BackgroundTask] Background tasks not available on this platform/device');
+        console.log('[BackgroundTask] Background tasks not available in Expo Go - will work in production builds');
       }
     } catch (error) {
-      console.log('[BackgroundTask] Background tasks not available:', error);
+      // This is expected in Expo Go
+      console.log('[BackgroundTask] Background tasks not available in current environment (expected in Expo Go)');
     }
   }
 

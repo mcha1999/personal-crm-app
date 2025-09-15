@@ -46,6 +46,10 @@ export abstract class BaseDAO<T> {
     return JSON.stringify(data || null);
   }
 
+  isAvailable(): boolean {
+    return this.db !== null && !this.isWebPlatform;
+  }
+
   async findAll(): Promise<T[]> {
     const db = this.ensureDatabase();
     if (!db || this.isWebPlatform) return [];

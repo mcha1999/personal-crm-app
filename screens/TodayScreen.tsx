@@ -55,12 +55,34 @@ export const TodayScreen: React.FC = () => {
 
   const loadData = async () => {
     try {
+      console.log('[TodayScreen] Starting data load...');
+      
+      // Check if database is available
+      if (!personDAO.isAvailable()) {
+        console.log('[TodayScreen] Database not available, using empty data');
+        setUpcomingTasks([]);
+        setFollowUpTasks([]);
+        setBirthdayPeople([]);
+        setPeopleToReachOut([]);
+        setRecentThreads([]);
+        setUpcomingMeetings([]);
+        return;
+      }
+      
       // Run score computation and follow-up detection
-      const scoreJob = ScoreJob.getInstance();
-      await scoreJob.run();
+      try {
+        const scoreJob = ScoreJob.getInstance();
+        await scoreJob.run();
+      } catch (scoreError) {
+        console.log('[TodayScreen] Score job failed (non-critical):', scoreError);
+      }
       
       // Process threads for follow-ups
-      await FollowUpService.processRecentMessages(24);
+      try {
+        await FollowUpService.processRecentMessages(24);
+      } catch (followUpError) {
+        console.log('[TodayScreen] Follow-up processing failed (non-critical):', followUpError);
+      }
 
       const [
         tasks, 
@@ -172,6 +194,13 @@ export const TodayScreen: React.FC = () => {
       setPeopleToReachOut(reachOut);
     } catch (error) {
       console.error('[TodayScreen] Failed to load data:', error);
+      // Set empty states on error
+      setUpcomingTasks([]);
+      setFollowUpTasks([]);
+      setBirthdayPeople([]);
+      setPeopleToReachOut([]);
+      setRecentThreads([]);
+      setUpcomingMeetings([]);
     }
   };
 

@@ -97,10 +97,19 @@ export const PersonCard: React.FC<PersonCardProps> = ({ person, score, onPress }
       ]}>
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
-          <Image 
-            source={{ uri: person.avatar || 'https://via.placeholder.com/100' }} 
-            style={styles.avatar}
-          />
+          {person.avatar && person.avatar.trim() !== '' ? (
+            <Image 
+              source={{ uri: person.avatar }} 
+              style={styles.avatar}
+            />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <Text style={styles.avatarInitials}>
+                {person.firstName.charAt(0).toUpperCase()}
+                {person.lastName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
           {person.cadence && (
             <Svg
               style={styles.progressRing}
@@ -194,6 +203,16 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     position: 'absolute' as const,
+  },
+  avatarPlaceholder: {
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitials: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold' as const,
   },
   progressRing: {
     position: 'absolute' as const,
