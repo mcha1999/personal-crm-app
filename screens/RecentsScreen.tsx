@@ -200,7 +200,7 @@ export const RecentsScreen: React.FC = () => {
       await scoreJob.run();
 
       const [allPeople, allScores] = await Promise.all([
-        personDAO.findAll(),
+        personDAO.findAllPersons(),
         personScoreDAO.findAll(),
       ]);
 

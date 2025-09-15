@@ -224,4 +224,20 @@ export class PersonDAO extends BaseDAO<PersonDB> {
   async getAll(): Promise<Person[]> {
     return this.getAllPersons();
   }
+
+  // Override BaseDAO's findAll to return Person[] instead of PersonDB[]
+  async findAll(): Promise<PersonDB[]> {
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return [];
+    const result = await db.getAllAsync<PersonDB>(
+      `SELECT * FROM ${this.tableName} ORDER BY createdAt DESC`
+    );
+    return result || [];
+  }
+
+  // Custom method to get all persons as Person objects
+  async findAllPersons(): Promise<Person[]> {
+    const dbResults = await this.findAll();
+    return dbResults.map(r => this.dbToPerson(r));
+  }
 }

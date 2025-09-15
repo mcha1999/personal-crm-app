@@ -93,7 +93,7 @@ export const TodayScreen: React.FC = () => {
         interactions
       ] = await Promise.all([
         taskDAO.getAllTasks(),
-        personDAO.findAll(),
+        personDAO.findAllPersons(),
         personScoreDAO.findAll(),
         threadDAO.findAll(),
         meetingDAO.findUpcoming(),
