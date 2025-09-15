@@ -85,19 +85,19 @@ function AppContent() {
 
 export default function RootLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+    <GestureHandlerRootView style={styles.rootView}>
+      <QueryClientProvider client={queryClient}>
         <DatabaseProvider>
-          <OnboardingProvider>
-            <ContactsProvider>
-              <GestureHandlerRootView style={styles.rootView}>
+          <AuthProvider>
+            <OnboardingProvider>
+              <ContactsProvider>
                 <AppContent />
-              </GestureHandlerRootView>
-            </ContactsProvider>
-          </OnboardingProvider>
+              </ContactsProvider>
+            </OnboardingProvider>
+          </AuthProvider>
         </DatabaseProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
 

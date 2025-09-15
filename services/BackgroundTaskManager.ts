@@ -188,7 +188,7 @@ export class BackgroundTaskManager {
     
     try {
       // Ensure database is initialized before running jobs
-      const { Database } = await import('@/database/Database');
+      const Database = (await import('@/database/Database')).Database;
       const database = Database.getInstance();
       
       if (!database.isAvailable()) {

@@ -1,4 +1,4 @@
 module.exports = {
   extends: 'expo',
-  ignorePatterns: ['dist/*']
+  ignorePatterns: ['dist/*', 'node_modules/*', '.expo/*', '*.js']
 };
