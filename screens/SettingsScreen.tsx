@@ -49,15 +49,12 @@ export const SettingsScreen: React.FC = () => {
   const { isAuthEnabled, enableAuth, disableAuth, getSupportedAuthTypes } = useAuth();
   const { isImporting, lastImportResult, lastImportDate, error: contactsError, importContacts, clearError } = useContacts();
   const { database, isInitialized } = useDatabase();
-  const { requestContactsPermission, requestCalendarPermission, connectGmail, steps } = useOnboarding();
+  const { requestContactsPermission, requestCalendarPermission, connectGmail, syncPreferences } = useOnboarding();
   
-  // Check permission states from onboarding
-  const contactsStep = steps.find(s => s.id === 'contacts');
-  const calendarStep = steps.find(s => s.id === 'calendar');
-  const gmailStep = steps.find(s => s.id === 'gmail');
-  const isContactsEnabled = contactsStep?.completed && !contactsStep?.error;
-  const isCalendarEnabled = calendarStep?.completed && !calendarStep?.error;
-  const isGmailEnabled = gmailStep?.completed && !gmailStep?.error;
+  // Check permission states from sync preferences
+  const isContactsEnabled = syncPreferences.contactsEnabled;
+  const isCalendarEnabled = syncPreferences.calendarEnabled;
+  const isGmailEnabled = syncPreferences.gmailEnabled;
 
   useEffect(() => {
     const loadTaskStatus = async () => {

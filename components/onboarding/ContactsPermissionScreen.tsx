@@ -29,7 +29,7 @@ export function ContactsPermissionScreen() {
 
   const handleSkip = () => {
     // Skip this step but don't enable contacts
-    completeStep('contacts');
+    completeStep('contacts', true);
   };
 
   return (

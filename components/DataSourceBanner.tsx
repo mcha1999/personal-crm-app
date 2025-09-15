@@ -7,16 +7,12 @@ import { theme } from '@/constants/theme';
 
 export const DataSourceBanner: React.FC = () => {
   const router = useRouter();
-  const { steps } = useOnboarding();
+  const { syncPreferences } = useOnboarding();
   
-  // Check which data sources are disabled
-  const contactsStep = steps.find(s => s.id === 'contacts');
-  const calendarStep = steps.find(s => s.id === 'calendar');
-  const gmailStep = steps.find(s => s.id === 'gmail');
-  
-  const isContactsEnabled = contactsStep?.completed && !contactsStep?.error;
-  const isCalendarEnabled = calendarStep?.completed && !calendarStep?.error;
-  const isGmailEnabled = gmailStep?.completed && !gmailStep?.error;
+  // Check which data sources are disabled from sync preferences
+  const isContactsEnabled = syncPreferences.contactsEnabled;
+  const isCalendarEnabled = syncPreferences.calendarEnabled;
+  const isGmailEnabled = syncPreferences.gmailEnabled;
   
   // Count disabled sources
   const disabledSources: string[] = [];

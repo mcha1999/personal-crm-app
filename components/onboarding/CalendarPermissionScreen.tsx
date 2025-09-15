@@ -36,7 +36,7 @@ export function CalendarPermissionScreen() {
   };
 
   const handleSkip = () => {
-    completeStep('calendar');
+    completeStep('calendar', true);
   };
 
   return (

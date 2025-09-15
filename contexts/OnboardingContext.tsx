@@ -26,6 +26,7 @@ export interface OnboardingStep {
   completed: boolean;
   inProgress: boolean;
   error?: string;
+  skipped?: boolean;
 }
 
 const defaultSyncPreferences: SyncPreferences = {
@@ -112,8 +113,8 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
     ));
   }, []);
 
-  const completeStep = useCallback((stepId: string): void => {
-    updateStepStatus(stepId, { completed: true, inProgress: false, error: undefined });
+  const completeStep = useCallback((stepId: string, skipped: boolean = false): void => {
+    updateStepStatus(stepId, { completed: true, inProgress: false, error: undefined, skipped });
     
     const stepIndex = steps.findIndex(step => step.id === stepId);
     if (stepIndex < steps.length - 1) {
@@ -149,9 +150,10 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
       setSyncPreferences(prev => ({ ...prev, contactsEnabled: granted }));
       
       if (granted) {
-        completeStep('contacts');
+        completeStep('contacts', false);
       } else {
-        setStepError('contacts', 'Contacts permission denied. You can enable this later in Settings.');
+        // Mark as completed but skipped
+        completeStep('contacts', true);
       }
       
       return granted;
@@ -186,9 +188,10 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
         }));
         
         if (granted) {
-          completeStep('calendar');
+          completeStep('calendar', false);
         } else {
-          setStepError('calendar', 'Calendar permission denied. You can enable this later in Settings.');
+          // Mark as completed but skipped
+          completeStep('calendar', true);
         }
         
         return granted;
@@ -199,7 +202,7 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
           calendarEnabled: true,
           calendarSource: 'google'
         }));
-        completeStep('calendar');
+        completeStep('calendar', false);
         return true;
       }
     } catch (error) {
@@ -223,10 +226,11 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
           gmailEnabled: true
         }));
         
-        completeStep('gmail');
+        completeStep('gmail', false);
         return true;
       } else {
-        setStepError('gmail', 'Gmail authentication was cancelled or failed. You can set this up later in Settings.');
+        // Mark as completed but skipped
+        completeStep('gmail', true);
         return false;
       }
     } catch (error) {
@@ -241,7 +245,7 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
       console.log('[Onboarding] Setting sync window to', days, 'days');
       
       setSyncPreferences(prev => ({ ...prev, syncWindowDays: days }));
-      completeStep('sync-window');
+      completeStep('sync-window', false);
     } catch (error) {
       console.error('[Onboarding] Error setting sync window:', error);
       setStepError('sync-window', 'Failed to set sync window');

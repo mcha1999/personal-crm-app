@@ -28,7 +28,7 @@ export function GmailConnectionScreen() {
   };
 
   const handleSkip = () => {
-    completeStep('gmail');
+    completeStep('gmail', true);
   };
 
   return (
