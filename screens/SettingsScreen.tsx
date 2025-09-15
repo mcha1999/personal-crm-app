@@ -476,7 +476,13 @@ export const SettingsScreen: React.FC = () => {
           type: 'action' as const,
           onPress: handleEnableCalendar,
         }] : []),
-
+        {
+          icon: <Mail size={20} color="#007AFF" />,
+          label: 'Link Email Account (IMAP)',
+          subtitle: 'Add Gmail, Outlook, iCloud, or custom IMAP',
+          type: 'action' as const,
+          onPress: () => router.push('/email-setup'),
+        },
       ],
     },
     {
@@ -528,40 +534,7 @@ export const SettingsScreen: React.FC = () => {
         },
       ],
     },
-    ...(ENABLE_GOOGLE_OAUTH ? [{
-      title: 'Google API Integration (Optional)',
-      items: [
-        {
-          icon: <RefreshCw size={20} color={googleAPIEnabled ? "#007AFF" : "#95A5A6"} />,
-          label: 'Enable Google Sync',
-          subtitle: googleAPIEnabled ? 'Enabled (device-only processing)' : 'Disabled',
-          type: 'switch' as const,
-          value: googleAPIEnabled,
-          onValueChange: handleGoogleAPIToggle,
-        },
-        {
-          icon: <Info size={20} color={googleAPIEnabled ? "#3498DB" : "#95A5A6"} />,
-          label: 'API Scopes & Permissions',
-          subtitle: googleAPIEnabled ? 'View required permissions' : 'Enable Google API first',
-          type: 'action' as const,
-          onPress: googleAPIEnabled ? showGoogleScopeInfo : () => {},
-        },
-        {
-          icon: <RefreshCw size={20} color={taskStatus?.gmailSync?.isRegistered ? "#007AFF" : "#95A5A6"} />,
-          label: 'Manual Gmail Sync',
-          subtitle: taskStatus ? `Last: ${taskStatus.gmailSync.lastRun ? formatLastRunTime(taskStatus.gmailSync.lastRun) : 'Never'} • Next: ${formatNextRunTime(taskStatus.gmailSync.nextRun)}` : 'Loading...',
-          type: 'action' as const,
-          onPress: handleManualSync,
-        },
-        {
-          icon: <Brain size={20} color="#9B59B6" />,
-          label: 'Manual Index & Score',
-          subtitle: taskStatus ? `Last: ${taskStatus.indexScore.lastRun ? formatLastRunTime(taskStatus.indexScore.lastRun) : 'Never'} • Next: ${formatNextRunTime(taskStatus.indexScore.nextRun)}` : 'Loading...',
-          type: 'action' as const,
-          onPress: handleManualScore,
-        },
-      ],
-    }] : [] as SettingSection[]),
+
     {
       title: 'Preferences',
       items: [
