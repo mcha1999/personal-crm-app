@@ -60,12 +60,8 @@ export class ScoreJob {
       
       // Ensure database is initialized
       if (!database.isAvailable()) {
-        console.log('[ScoreJob] Database not initialized, initializing now...');
-        await database.init();
-        
-        if (!database.isAvailable()) {
-          throw new Error('Database initialization failed');
-        }
+        console.log('[ScoreJob] Database not available');
+        throw new Error('Database not available');
       }
 
       // Create DAOs after ensuring database is available

@@ -187,6 +187,19 @@ export class BackgroundTaskManager {
     console.log('[BackgroundTask] Starting local index and score update...');
     
     try {
+      // Ensure database is initialized before running jobs
+      const { Database } = await import('@/database/Database');
+      const database = Database.getInstance();
+      
+      if (!database.isAvailable()) {
+        console.log('[BackgroundTask] Database not initialized, initializing now...');
+        await database.init();
+        
+        if (!database.isAvailable()) {
+          throw new Error('Database initialization failed');
+        }
+      }
+      
       // Run scoring job
       const scoreJob = ScoreJob.getInstance();
       const scoreResult = await scoreJob.run();
