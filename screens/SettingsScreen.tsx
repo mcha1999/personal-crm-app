@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield, Upload, FileText, Users, Calendar as CalendarIcon, Mail } from 'lucide-react-native';
+import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield, Upload, FileText, Users, Calendar as CalendarIcon, Mail, Calculator } from 'lucide-react-native';
 import { BackgroundTaskManager } from '../services/BackgroundTaskManager';
 import { GoogleAPIService } from '../services/GoogleAPIService';
 import { LocalExport } from '../database/LocalExport';
@@ -16,6 +16,7 @@ import { MeetingDAO } from '../database/MeetingDAO';
 import { PlaceDAO } from '../database/PlaceDAO';
 import { InteractionDAO } from '../database/InteractionDAO';
 import { GmailSync } from '../services/GmailSync';
+import { ScoreJob } from '../jobs/ScoreJob';
 import * as LocalAuthentication from 'expo-local-authentication';
 
 type SettingItem = 

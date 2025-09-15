@@ -11,16 +11,17 @@ import {
   Dimensions,
   Image,
 } from 'react-native';
-import { PersonRepository } from '@/repositories/PersonRepository';
-import { InteractionRepository } from '@/repositories/InteractionRepository';
+import { PersonDAO } from '@/database/PersonDAO';
+import { PersonScoreDAO } from '@/database/PersonScoreDAO';
+import { InteractionDAO } from '@/database/InteractionDAO';
 import { Person } from '@/models/Person';
 import { PersonScore } from '@/models/PersonScore';
-import { mockPersonScores } from '@/repositories/mockData';
 import { Clock, CheckCircle, Bell } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { GradientHeader } from '@/components/GradientHeader';
 import { ConfettiAnimation } from '@/components/ConfettiAnimation';
 import { theme } from '@/constants/theme';
+import { ScoreJob } from '@/jobs/ScoreJob';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -180,50 +181,70 @@ export const RecentsScreen: React.FC = () => {
   const [snoozed, setSnoozed] = useState<Set<string>>(new Set());
   const [showConfetti, setShowConfetti] = useState(false);
 
-  const personRepo = new PersonRepository();
-  const interactionRepo = new InteractionRepository();
+  const personDAO = new PersonDAO();
+  const personScoreDAO = new PersonScoreDAO();
+  const interactionDAO = new InteractionDAO();
 
   const loadData = async () => {
-    const people = await personRepo.getAllPeople();
-    
-    // Rank people by interaction score and recency
-    const ranked = people
-      .map(person => {
-        const score = mockPersonScores.find(s => s.personId === person.id);
-        if (!score) return null;
-        
-        const daysAgo = score.lastInteractionDaysAgo;
-        let lastInteractionText = '';
-        
-        if (daysAgo === 0) {
-          lastInteractionText = 'Today';
-        } else if (daysAgo === 1) {
-          lastInteractionText = 'Yesterday';
-        } else if (daysAgo < 7) {
-          lastInteractionText = `${daysAgo} days ago`;
-        } else if (daysAgo < 30) {
-          const weeks = Math.floor(daysAgo / 7);
-          lastInteractionText = `${weeks} week${weeks > 1 ? 's' : ''} ago`;
-        } else {
-          const months = Math.floor(daysAgo / 30);
-          lastInteractionText = `${months} month${months > 1 ? 's' : ''} ago`;
-        }
-        
-        return {
-          person,
-          score,
-          lastInteractionText,
-        };
-      })
-      .filter((item): item is RankedPerson => item !== null)
-      .sort((a, b) => {
-        // Sort by days since last interaction (ascending) and relationship score (descending)
-        const daysDiff = a.score.lastInteractionDaysAgo - b.score.lastInteractionDaysAgo;
-        if (Math.abs(daysDiff) > 3) return daysDiff;
-        return b.score.relationshipScore - a.score.relationshipScore;
-      });
-    
-    setRankedPeople(ranked);
+    try {
+      // Run score computation first
+      const scoreJob = ScoreJob.getInstance();
+      await scoreJob.run();
+
+      const [allPeople, allScores] = await Promise.all([
+        personDAO.findAll(),
+        personScoreDAO.findAll(),
+      ]);
+
+      // Convert DB objects to model objects
+      const peopleModels: Person[] = [];
+      for (const person of allPeople) {
+        peopleModels.push(person as unknown as Person);
+      }
+
+      const scoreMap = new Map(allScores.map(s => [s.personId, s]));
+      
+      // Rank people by interaction score and recency
+      const ranked = peopleModels
+        .map(person => {
+          const score = scoreMap.get(person.id);
+          if (!score) return null;
+          
+          const daysAgo = score.lastInteractionDaysAgo;
+          let lastInteractionText = '';
+          
+          if (daysAgo === 0) {
+            lastInteractionText = 'Today';
+          } else if (daysAgo === 1) {
+            lastInteractionText = 'Yesterday';
+          } else if (daysAgo < 7) {
+            lastInteractionText = `${daysAgo} days ago`;
+          } else if (daysAgo < 30) {
+            const weeks = Math.floor(daysAgo / 7);
+            lastInteractionText = `${weeks} week${weeks > 1 ? 's' : ''} ago`;
+          } else {
+            const months = Math.floor(daysAgo / 30);
+            lastInteractionText = `${months} month${months > 1 ? 's' : ''} ago`;
+          }
+          
+          return {
+            person,
+            score,
+            lastInteractionText,
+          };
+        })
+        .filter((item): item is RankedPerson => item !== null)
+        .sort((a, b) => {
+          // Sort by days since last interaction (ascending) and relationship score (descending)
+          const daysDiff = a.score.lastInteractionDaysAgo - b.score.lastInteractionDaysAgo;
+          if (Math.abs(daysDiff) > 3) return daysDiff;
+          return b.score.relationshipScore - a.score.relationshipScore;
+        });
+      
+      setRankedPeople(ranked);
+    } catch (error) {
+      console.error('[RecentsScreen] Failed to load data:', error);
+    }
   };
 
   useEffect(() => {
@@ -236,16 +257,28 @@ export const RecentsScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const handleMarkTouched = (personId: string) => {
-    setMarkedTouched(prev => new Set(prev).add(personId));
-    setShowConfetti(true);
-    // In a real app, this would update the backend
-    console.log(`Marked ${personId} as touched`);
+  const handleMarkTouched = async (personId: string) => {
+    try {
+      // Mark person as touched in database
+      await interactionDAO.markPersonTouched(personId, 'message', 'Marked as touched from Recents screen');
+      
+      setMarkedTouched(prev => new Set(prev).add(personId));
+      setShowConfetti(true);
+      
+      // Refresh data to update scores
+      setTimeout(() => {
+        loadData();
+      }, 1000);
+      
+      console.log(`Marked ${personId} as touched`);
+    } catch (error) {
+      console.error('Failed to mark person as touched:', error);
+    }
   };
 
   const handleSnooze = (personId: string) => {
     setSnoozed(prev => new Set(prev).add(personId));
-    // In a real app, this would update the backend
+    // In a real app, this would create a snooze record with expiration
     console.log(`Snoozed ${personId}`);
   };
 

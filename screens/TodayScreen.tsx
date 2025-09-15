@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { PersonRepository } from '@/repositories/PersonRepository';
-import { TaskRepository } from '@/repositories/TaskRepository';
-import { InteractionRepository } from '@/repositories/InteractionRepository';
+import { PersonDAO } from '@/database/PersonDAO';
+import { TaskDAO } from '@/database/TaskDAO';
+import { PersonScoreDAO } from '@/database/PersonScoreDAO';
 import { TaskCard } from '@/components/TaskCard';
 import { PersonCard } from '@/components/PersonCard';
 import { Person } from '@/models/Person';
 import { Task } from '@/models/Task';
 import { PersonScore } from '@/models/PersonScore';
-import { mockPersonScores } from '@/repositories/mockData';
 import { GradientHeader } from '@/components/GradientHeader';
 import { theme } from '@/constants/theme';
+import { ScoreJob } from '@/jobs/ScoreJob';
 
 export const TodayScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
@@ -19,31 +19,75 @@ export const TodayScreen: React.FC = () => {
   const [birthdayPeople, setBirthdayPeople] = useState<Person[]>([]);
   const [peopleToReachOut, setPeopleToReachOut] = useState<Person[]>([]);
   const [peopleMap, setPeopleMap] = useState<Map<string, Person>>(new Map());
+  const [scoresMap, setScoresMap] = useState<Map<string, PersonScore>>(new Map());
   const fadeAnim = new Animated.Value(0);
 
-  const personRepo = new PersonRepository();
-  const taskRepo = new TaskRepository();
+  const personDAO = new PersonDAO();
+  const taskDAO = new TaskDAO();
+  const personScoreDAO = new PersonScoreDAO();
 
   const loadData = async () => {
-    const [tasks, birthdays, allPeople] = await Promise.all([
-      taskRepo.getUpcomingTasks(),
-      personRepo.getPeopleWithUpcomingBirthdays(7),
-      personRepo.getAllPeople(),
-    ]);
+    try {
+      // Run score computation first
+      const scoreJob = ScoreJob.getInstance();
+      await scoreJob.run();
 
-    const personMap = new Map(allPeople.map(p => [p.id, p]));
-    setPeopleMap(personMap);
-    setUpcomingTasks(tasks.slice(0, 5));
-    setBirthdayPeople(birthdays);
+      const [tasks, allPeople, allScores] = await Promise.all([
+        taskDAO.findAll(),
+        personDAO.findAll(),
+        personScoreDAO.findAll(),
+      ]);
 
-    // Find people we haven't interacted with recently
-    const reachOut = allPeople
-      .filter(p => {
-        const score = mockPersonScores.find(s => s.personId === p.id);
-        return score && score.lastInteractionDaysAgo > 14;
-      })
-      .slice(0, 3);
-    setPeopleToReachOut(reachOut);
+      // Convert DB objects to model objects
+      const peopleModels: Person[] = [];
+      const tasksModels: Task[] = [];
+      
+      // Convert people (PersonDAO should return Person objects, not PersonDB)
+      for (const person of allPeople) {
+        peopleModels.push(person as unknown as Person);
+      }
+      
+      // Convert tasks (TaskDAO should return Task objects, not TaskDB)
+      for (const task of tasks) {
+        tasksModels.push(task as unknown as Task);
+      }
+
+      const personMap = new Map(peopleModels.map(p => [p.id, p]));
+      const scoreMap = new Map(allScores.map(s => [s.personId, s]));
+      setPeopleMap(personMap);
+      setScoresMap(scoreMap);
+
+      // Filter tasks for today and upcoming
+      const today = new Date();
+      const todayTasks = tasksModels.filter(task => {
+        if (!task.dueDate) return false;
+        const dueDate = new Date(task.dueDate);
+        const diffTime = dueDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays >= 0 && diffDays <= 1; // Today and tomorrow
+      }).slice(0, 5);
+      setUpcomingTasks(todayTasks);
+
+      // Find people with birthdays in next 7 days (simplified - would need birthday field)
+      // For now, just show empty array
+      setBirthdayPeople([]);
+
+      // Find people we haven't interacted with recently based on scores
+      const reachOut = peopleModels
+        .filter(p => {
+          const score = scoreMap.get(p.id);
+          return score && score.lastInteractionDaysAgo > 14;
+        })
+        .sort((a, b) => {
+          const scoreA = scoreMap.get(a.id);
+          const scoreB = scoreMap.get(b.id);
+          return (scoreB?.relationshipScore || 0) - (scoreA?.relationshipScore || 0);
+        })
+        .slice(0, 3);
+      setPeopleToReachOut(reachOut);
+    } catch (error) {
+      console.error('[TodayScreen] Failed to load data:', error);
+    }
   };
 
   useEffect(() => {
@@ -89,7 +133,7 @@ export const TodayScreen: React.FC = () => {
         }
       >
 
-        <Animated.View style={{ opacity: fadeAnim }}>
+        <Animated.View style={styles.animatedContainer}>
           {upcomingTasks.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Tasks for Today</Text>
@@ -110,7 +154,7 @@ export const TodayScreen: React.FC = () => {
                 <PersonCard
                   key={person.id}
                   person={person}
-                  score={mockPersonScores.find(s => s.personId === person.id)}
+                  score={scoresMap.get(person.id)}
                 />
               ))}
             </View>
@@ -119,12 +163,12 @@ export const TodayScreen: React.FC = () => {
           {peopleToReachOut.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Stay in Touch</Text>
-              <Text style={styles.sectionSubtitle}>You haven't connected in a while</Text>
+              <Text style={styles.sectionSubtitle}>You haven&apos;t connected in a while</Text>
               {peopleToReachOut.map(person => (
                 <PersonCard
                   key={person.id}
                   person={person}
-                  score={mockPersonScores.find(s => s.personId === person.id)}
+                  score={scoresMap.get(person.id)}
                 />
               ))}
             </View>
@@ -185,5 +229,8 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 100,
+  },
+  animatedContainer: {
+    opacity: 1,
   },
 });
