@@ -110,27 +110,40 @@ export class Database {
     if (currentVersion < 2) {
       console.log('Running migration 1 -> 2: Adding normalizedName to places');
       try {
-        // Check if column already exists
-        const tableInfo = await this.db.getAllAsync(
-          "PRAGMA table_info(places)"
+        // Check if places table exists
+        const tableExists = await this.db.getFirstAsync(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='places'"
         );
-        const hasNormalizedName = tableInfo.some((col: any) => col.name === 'normalizedName');
         
-        if (!hasNormalizedName) {
-          // Add the normalizedName column
-          await this.db.execAsync(`
-            ALTER TABLE places ADD COLUMN normalizedName TEXT;
-          `);
+        if (tableExists) {
+          // Check if column already exists
+          const tableInfo = await this.db.getAllAsync(
+            "PRAGMA table_info(places)"
+          );
+          const hasNormalizedName = tableInfo.some((col: any) => col.name === 'normalizedName');
           
-          // Update existing rows with normalized names
-          await this.db.execAsync(`
-            UPDATE places 
-            SET normalizedName = LOWER(TRIM(REPLACE(REPLACE(REPLACE(name, '  ', ' '), '\n', ' '), '\r', ' ')))
-            WHERE normalizedName IS NULL;
-          `);
+          if (!hasNormalizedName) {
+            console.log('Adding normalizedName column to places table');
+            // Add the normalizedName column with a default value
+            await this.db.execAsync(`
+              ALTER TABLE places ADD COLUMN normalizedName TEXT DEFAULT '';
+            `);
+            
+            // Update existing rows with normalized names
+            await this.db.execAsync(`
+              UPDATE places 
+              SET normalizedName = LOWER(TRIM(REPLACE(REPLACE(REPLACE(name, '  ', ' '), '\n', ' '), '\r', ' ')))
+              WHERE normalizedName = '' OR normalizedName IS NULL;
+            `);
+            
+            console.log('Successfully added normalizedName column');
+          } else {
+            console.log('normalizedName column already exists');
+          }
         }
       } catch (error) {
-        console.log('Migration 1 -> 2 error (may be already applied):', error);
+        console.error('Migration 1 -> 2 failed:', error);
+        // Don't throw - let the app continue with potential issues
       }
     }
 
@@ -235,7 +248,7 @@ export class Database {
       CREATE TABLE IF NOT EXISTS places (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        normalizedName TEXT NOT NULL,
+        normalizedName TEXT,
         address TEXT,
         latitude REAL,
         longitude REAL,

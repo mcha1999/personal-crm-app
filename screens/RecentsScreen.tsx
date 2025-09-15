@@ -22,6 +22,7 @@ import { GradientHeader } from '@/components/GradientHeader';
 import { ConfettiAnimation } from '@/components/ConfettiAnimation';
 import { theme } from '@/constants/theme';
 import { ScoreJob } from '@/jobs/ScoreJob';
+import { Database } from '@/database/Database';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -187,6 +188,13 @@ export const RecentsScreen: React.FC = () => {
 
   const loadData = async () => {
     try {
+      // Check if database is available
+      const database = Database.getInstance();
+      if (!database.isAvailable()) {
+        console.log('[RecentsScreen] Database not available, skipping data load');
+        return;
+      }
+
       // Run score computation first
       const scoreJob = ScoreJob.getInstance();
       await scoreJob.run();

@@ -4,7 +4,7 @@ import { Place, PlaceWithStats, normalizePlaceName } from '../models/Place';
 interface PlaceDB {
   id: string;
   name: string;
-  normalizedName: string;
+  normalizedName: string | null;
   address: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -22,7 +22,7 @@ export class PlaceDAO extends BaseDAO<PlaceDB> {
     return {
       id: db.id,
       name: db.name,
-      normalizedName: db.normalizedName,
+      normalizedName: db.normalizedName || normalizePlaceName(db.name),
       address: db.address || undefined,
       latitude: db.latitude || 0,
       longitude: db.longitude || 0,
