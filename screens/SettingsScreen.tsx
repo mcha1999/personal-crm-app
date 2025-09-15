@@ -219,17 +219,11 @@ export const SettingsScreen: React.FC = () => {
     try {
       setIsCalendarImporting(true);
       
-      // Create DAO instances
+      // Create DAO instances (they automatically connect to the database)
       const personDAO = new PersonDAO();
       const meetingDAO = new MeetingDAO();
       const placeDAO = new PlaceDAO();
       const interactionDAO = new InteractionDAO();
-      
-      // Initialize DAOs with database
-      personDAO.setDatabase(database.getDb());
-      meetingDAO.setDatabase(database.getDb());
-      placeDAO.setDatabase(database.getDb());
-      interactionDAO.setDatabase(database.getDb());
       
       const calendarListener = CalendarListener.getInstance(
         personDAO,
