@@ -17,7 +17,7 @@ import { PersonDAO } from '../database/PersonDAO';
 import { MeetingDAO } from '../database/MeetingDAO';
 import { PlaceDAO } from '../database/PlaceDAO';
 import { InteractionDAO } from '../database/InteractionDAO';
-import { GmailSync } from '../services/GmailSync';
+
 import { ScoreJob } from '../jobs/ScoreJob';
 import * as LocalAuthentication from 'expo-local-authentication';
 
@@ -41,20 +41,18 @@ export const SettingsScreen: React.FC = () => {
   const [supportedAuthTypes, setSupportedAuthTypes] = React.useState<LocalAuthentication.AuthenticationType[]>([]);
   const [isCalendarImporting, setIsCalendarImporting] = React.useState(false);
   const [lastCalendarImport, setLastCalendarImport] = React.useState<Date | null>(null);
-  const [isGmailSyncing, setIsGmailSyncing] = React.useState<boolean>(false);
-  const [lastGmailSync, setLastGmailSync] = React.useState<Date | null>(null);
-  const [isGmailAuthenticated, setIsGmailAuthenticated] = React.useState<boolean>(false);
+
   const [healthTapCount, setHealthTapCount] = React.useState(0);
   
   const { isAuthEnabled, enableAuth, disableAuth, getSupportedAuthTypes } = useAuth();
   const { isImporting, lastImportResult, lastImportDate, error: contactsError, importContacts, clearError } = useContacts();
   const { database, isInitialized } = useDatabase();
-  const { requestContactsPermission, requestCalendarPermission, connectGmail, syncPreferences } = useOnboarding();
+  const { requestContactsPermission, requestCalendarPermission, syncPreferences } = useOnboarding();
   
   // Check permission states from sync preferences
   const isContactsEnabled = syncPreferences.contactsEnabled;
   const isCalendarEnabled = syncPreferences.calendarEnabled;
-  const isGmailEnabled = syncPreferences.gmailEnabled;
+
 
   useEffect(() => {
     const loadTaskStatus = async () => {
@@ -73,17 +71,7 @@ export const SettingsScreen: React.FC = () => {
       setGoogleAPIEnabled(authenticated);
     };
     
-    // Check Gmail authentication status
-    const checkGmailAuth = async () => {
-      try {
-        const gmailSync = GmailSync.getInstance();
-        const authenticated = await gmailSync.isAuthenticated();
-        setIsGmailAuthenticated(authenticated);
-      } catch (error) {
-        console.error('Error checking Gmail auth:', error);
-        setIsGmailAuthenticated(false);
-      }
-    };
+
     
     // Check supported authentication types
     const checkAuthTypes = async () => {
@@ -92,7 +80,6 @@ export const SettingsScreen: React.FC = () => {
     };
     
     checkGoogleAuth();
-    checkGmailAuth();
     checkAuthTypes();
 
     const interval = setInterval(() => {
@@ -326,15 +313,7 @@ export const SettingsScreen: React.FC = () => {
       Alert.alert('Permission Denied', 'Could not enable calendar access');
     }
   };
-  
-  const handleLinkGmail = async () => {
-    try {
-      await connectGmail();
-      Alert.alert('Success', 'Gmail connected successfully');
-    } catch (error) {
-      Alert.alert('Connection Failed', 'Could not connect to Gmail');
-    }
-  };
+
 
   const handleImportCalendar = async () => {
     if (isCalendarImporting || !isInitialized) return;
@@ -401,70 +380,7 @@ export const SettingsScreen: React.FC = () => {
     return 'Import events from calendar (180 days past, 60 days future)';
   };
 
-  const handleGmailAuth = async () => {
-    try {
-      const gmailSync = GmailSync.getInstance();
-      const success = await gmailSync.authenticate();
-      
-      if (success) {
-        setIsGmailAuthenticated(true);
-        Alert.alert('Gmail Connected', 'Gmail has been connected successfully. You can now sync your email data.');
-      } else {
-        Alert.alert('Authentication Failed', 'Gmail authentication was cancelled or failed.');
-      }
-    } catch (error) {
-      console.error('Gmail auth error:', error);
-      Alert.alert('Error', 'Failed to authenticate with Gmail');
-    }
-  };
 
-  const handleGmailSync = async () => {
-    if (isGmailSyncing || !isGmailAuthenticated) return;
-    
-    try {
-      setIsGmailSyncing(true);
-      
-      const googleAPI = GoogleAPIService.getInstance();
-      const result = await googleAPI.syncGmail(100);
-      
-      setLastGmailSync(new Date());
-      Alert.alert(
-        'Gmail Sync Complete',
-        `Synced: ${result.messages.length} messages, ${result.threads.length} threads, ${result.interactions.length} interactions`,
-        [{ text: 'OK' }]
-      );
-    } catch (error) {
-      console.error('Gmail sync error:', error);
-      const message = error instanceof Error ? error.message : 'Failed to sync Gmail';
-      Alert.alert('Sync Failed', message);
-    } finally {
-      setIsGmailSyncing(false);
-    }
-  };
-
-  const handleGmailSignOut = async () => {
-    try {
-      const gmailSync = GmailSync.getInstance();
-      await gmailSync.signOut();
-      setIsGmailAuthenticated(false);
-      setLastGmailSync(null);
-      Alert.alert('Gmail Disconnected', 'Gmail has been disconnected successfully.');
-    } catch (error) {
-      console.error('Gmail sign out error:', error);
-      Alert.alert('Error', 'Failed to disconnect Gmail');
-    }
-  };
-
-  const getGmailSyncSubtitle = (): string => {
-    if (!isGmailAuthenticated) return 'Connect Gmail to sync email data';
-    if (isGmailSyncing) return 'Syncing Gmail data...';
-    if (lastGmailSync) {
-      const timeAgo = Math.floor((Date.now() - lastGmailSync.getTime()) / (1000 * 60));
-      const timeStr = timeAgo < 60 ? `${timeAgo}m ago` : `${Math.floor(timeAgo / 60)}h ago`;
-      return `Last sync: ${timeStr}`;
-    }
-    return 'Sync email interactions and threads';
-  };
 
   const handleAuthToggle = async (enabled: boolean) => {
     if (Platform.OS === 'web') {
@@ -544,13 +460,7 @@ export const SettingsScreen: React.FC = () => {
           type: 'action' as const,
           onPress: handleEnableCalendar,
         }] : []),
-        ...(!isGmailEnabled ? [{
-          icon: <Mail size={20} color="#FF9500" />,
-          label: 'Link Gmail',
-          subtitle: 'Connect your Gmail account',
-          type: 'action' as const,
-          onPress: handleLinkGmail,
-        }] : []),
+
       ],
     },
     {
@@ -592,21 +502,7 @@ export const SettingsScreen: React.FC = () => {
           onPress: handleImportCalendar,
           loading: isCalendarImporting,
         },
-        {
-          icon: <Mail size={20} color={isGmailAuthenticated ? (isGmailSyncing ? "#F39C12" : "#E74C3C") : "#95A5A6"} />,
-          label: isGmailAuthenticated ? 'Sync Gmail' : 'Connect Gmail',
-          subtitle: getGmailSyncSubtitle(),
-          type: 'action',
-          onPress: isGmailAuthenticated ? handleGmailSync : handleGmailAuth,
-          loading: isGmailSyncing,
-        },
-        ...(isGmailAuthenticated ? [{
-          icon: <Mail size={20} color="#95A5A6" />,
-          label: 'Disconnect Gmail',
-          subtitle: 'Remove Gmail connection and clear tokens',
-          type: 'action' as const,
-          onPress: handleGmailSignOut,
-        }] : []),
+
         {
           icon: <RefreshCw size={20} color="#E74C3C" />,
           label: 'Reset Database',

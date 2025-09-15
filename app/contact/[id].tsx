@@ -198,7 +198,10 @@ export default function ContactScreen() {
               <TouchableOpacity style={styles.actionButton}>
                 <MessageCircle size={20} color="#45B7D1" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => router.push(`/email-compose?personId=${id}`)}
+              >
                 <Mail size={20} color="#45B7D1" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton}>
