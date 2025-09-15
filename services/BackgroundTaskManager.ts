@@ -194,16 +194,34 @@ export class BackgroundTaskManager {
     console.log('[BackgroundTask] Starting local index and score update...');
     
     try {
+      // Import Platform to check if we're on web
+      const { Platform } = await import('react-native');
+      
+      if (Platform.OS === 'web') {
+        console.log('[BackgroundTask] Skipping index and score on web platform');
+        return {
+          success: true,
+          scoresComputed: 0,
+          followUpTasks: 0,
+          error: 'Skipped on web platform'
+        };
+      }
+      
       // Ensure database is initialized before running jobs
       const Database = (await import('@/database/Database')).Database;
       const database = Database.getInstance();
       
       if (!database.isAvailable()) {
         console.log('[BackgroundTask] Database not initialized, initializing now...');
-        await database.init();
+        try {
+          await database.init();
+        } catch (initError) {
+          console.error('[BackgroundTask] Database initialization failed:', initError);
+          throw new Error(`Database initialization failed: ${initError instanceof Error ? initError.message : 'Unknown error'}`);
+        }
         
         if (!database.isAvailable()) {
-          throw new Error('Database initialization failed');
+          throw new Error('Database still not available after initialization');
         }
       }
       

@@ -29,12 +29,15 @@ export class Database {
         await this.runMigrations();
         await this.createTables();
         await this.seedInitialData();
+        console.log('[Database] SQLite initialization completed successfully');
       } else {
         console.log('[Database] Running on web platform - database disabled');
       }
     } catch (error) {
-      console.warn('[Database] SQLite initialization failed:', error);
-      // Continue without database on web
+      console.error('[Database] SQLite initialization failed:', error);
+      this.db = null;
+      // Re-throw the error so callers know initialization failed
+      throw new Error(`Database initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

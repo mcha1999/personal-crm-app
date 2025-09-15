@@ -56,17 +56,30 @@ export class ScoreJob {
     this.isRunning = true;
 
     try {
+      // Import Platform to check if we're on web
+      const { Platform } = await import('react-native');
+      
+      if (Platform.OS === 'web') {
+        console.log('[ScoreJob] Skipping score computation on web platform');
+        return { success: true, scoresComputed: 0, error: 'Skipped on web platform' };
+      }
+      
       const database = Database.getInstance();
       
       // Ensure database is initialized
       if (!database.isAvailable()) {
         console.log('[ScoreJob] Database not available, attempting to initialize...');
-        await database.init();
+        try {
+          await database.init();
+        } catch (initError) {
+          console.error('[ScoreJob] Database initialization failed:', initError);
+          throw new Error(`Database initialization failed: ${initError instanceof Error ? initError.message : 'Unknown error'}`);
+        }
         
         // Check again after initialization
         if (!database.isAvailable()) {
           console.log('[ScoreJob] Database still not available after initialization');
-          throw new Error('Database not available');
+          throw new Error('Database still not available after initialization');
         }
       }
 
