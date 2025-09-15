@@ -56,7 +56,7 @@ export const SettingsScreen: React.FC = () => {
   const { isAuthEnabled, enableAuth, disableAuth, getSupportedAuthTypes } = useAuth();
   const { isImporting, lastImportResult, lastImportDate, error: contactsError, importContacts, clearError } = useContacts();
   const { database, isInitialized } = useDatabase();
-  const { requestContactsPermission, requestCalendarPermission, syncPreferences } = useOnboarding();
+  const { requestContactsPermission, requestCalendarPermission, syncPreferences, resetOnboarding } = useOnboarding();
   
   // Check permission states from sync preferences
   const isContactsEnabled = syncPreferences.contactsEnabled;
@@ -270,6 +270,29 @@ export const SettingsScreen: React.FC = () => {
             } catch (error) {
               console.error('Import error:', error);
               Alert.alert('Import Failed', 'Could not import data');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleResetOnboarding = async () => {
+    Alert.alert(
+      'Reset Onboarding',
+      'This will show the welcome flow again when you restart the app.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'default',
+          onPress: async () => {
+            try {
+              await resetOnboarding();
+              Alert.alert('Success', 'Onboarding has been reset. Please restart the app to see the welcome flow.');
+            } catch (error) {
+              console.error('Reset onboarding error:', error);
+              Alert.alert('Reset Failed', 'Could not reset onboarding');
             }
           }
         }
@@ -546,6 +569,13 @@ export const SettingsScreen: React.FC = () => {
           subtitle: 'Clear all data and start fresh',
           type: 'action' as const,
           onPress: handleResetDatabase,
+        },
+        {
+          icon: <RefreshCw size={20} color="#FF9500" />,
+          label: 'Reset Onboarding',
+          subtitle: 'Show the welcome flow again',
+          type: 'action' as const,
+          onPress: handleResetOnboarding,
         },
       ],
     },
