@@ -31,7 +31,11 @@
         "NSFaceIDUsageDescription": "Allow $(PRODUCT_NAME) to access your Face ID biometric data.",
         "NSContactsUsageDescription": "A message that tells the user why the app is requesting access to the user's contacts.",
         "NSCalendarsUsageDescription": "Allow $(PRODUCT_NAME) to access your calendar",
-        "NSRemindersUsageDescription": "Allow $(PRODUCT_NAME) to access your reminders"
+        "NSRemindersUsageDescription": "Allow $(PRODUCT_NAME) to access your reminders",
+        "UIBackgroundModes": [
+          "fetch",
+          "background-processing"
+        ]
       },
       "config": {
         "usesNonExemptEncryption": false
@@ -54,7 +58,9 @@
         "READ_CONTACTS",
         "WRITE_CONTACTS",
         "READ_CALENDAR",
-        "WRITE_CALENDAR"
+        "WRITE_CALENDAR",
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK"
       ]
     },
     "web": {

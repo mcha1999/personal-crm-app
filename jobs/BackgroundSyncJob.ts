@@ -1,32 +1,22 @@
 /**
- * Background Sync Job - Device-Only Architecture
+ * Background Sync Job - Coordinated Background Processing
  * 
- * Privacy-First Background Processing:
+ * Privacy-First Implementation:
+ * - Coordinates Gmail sync and scoring jobs
  * - All processing happens locally on device
- * - No external services or cloud processing
- * - Syncs with Google APIs directly from device (when enabled)
- * - All data remains in local SQLite database
+ * - No external service calls during background execution
+ * - Maintains device-only data processing architecture
  */
 
-import { Platform } from 'react-native';
-import { GoogleAPIService } from '@/services/GoogleAPIService';
-import { PersonRepository } from '@/repositories/PersonRepository';
-import { InteractionRepository } from '@/repositories/InteractionRepository';
-import { TaskRepository } from '@/repositories/TaskRepository';
-import { PRIVACY_CONFIG } from '@/constants/privacy';
+import { BackgroundTaskManager } from '@/services/BackgroundTaskManager';
+import { GmailSync } from '@/services/GmailSync';
+import { ScoreJob } from './ScoreJob';
 
-export interface SyncResult {
-  success: boolean;
-  contactsImported: number;
-  interactionsDetected: number;
-  tasksCreated: number;
-  error?: string;
-}
+
 
 export class BackgroundSyncJob {
   private static instance: BackgroundSyncJob;
   private isRunning = false;
-  private lastSyncTime: Date | null = null;
 
   private constructor() {}
 
@@ -38,91 +28,51 @@ export class BackgroundSyncJob {
   }
 
   /**
-   * Run Background Sync - Device-Only Processing
+   * Run Complete Background Sync
    * 
-   * Privacy Implementation:
-   * - Only runs if user has explicitly enabled Google integration
-   * - All API calls made directly from device to Google
-   * - All data processing happens locally
-   * - No external services involved in sync process
+   * Coordinates both Gmail sync and scoring in the correct order:
+   * 1. Gmail delta sync (fetch new emails)
+   * 2. Score computation (update relationship scores)
    */
-  async runSync(): Promise<SyncResult> {
+  async runCompleteSync(): Promise<{
+    success: boolean;
+    gmailResult?: any;
+    scoreResult?: any;
+    error?: string;
+  }> {
     if (this.isRunning) {
-      console.log('[BackgroundSync] Sync already in progress, skipping...');
-      return { success: false, contactsImported: 0, interactionsDetected: 0, tasksCreated: 0, error: 'Sync already running' };
+      console.log('[BackgroundSyncJob] Sync already in progress, skipping...');
+      return { success: false, error: 'Sync already running' };
     }
 
-    console.log('[BackgroundSync] Starting device-only background sync...');
+    console.log('[BackgroundSyncJob] Starting complete background sync...');
     this.isRunning = true;
 
     try {
-      // Check if Google integration is enabled (privacy-first)
-      if (!PRIVACY_CONFIG.googleAPI.enabled) {
-        console.log('[BackgroundSync] Google API integration disabled - respecting privacy settings');
-        return { success: true, contactsImported: 0, interactionsDetected: 0, tasksCreated: 0 };
-      }
-
-      const googleAPI = GoogleAPIService.getInstance();
-      const isAuthenticated = await googleAPI.isAuthenticated();
+      const taskManager = BackgroundTaskManager.getInstance();
       
-      if (!isAuthenticated) {
-        console.log('[BackgroundSync] Not authenticated with Google - skipping sync');
-        return { success: true, contactsImported: 0, interactionsDetected: 0, tasksCreated: 0 };
-      }
-
-      let contactsImported = 0;
-      let interactionsDetected = 0;
-      let tasksCreated = 0;
-
-      // Sync Contacts - Device-Only Import
-      try {
-        console.log('[BackgroundSync] Syncing contacts (device-only import)...');
-        const contacts = await googleAPI.fetchContacts(100);
-        contactsImported = await this.importContacts(contacts);
-        console.log(`[BackgroundSync] Imported ${contactsImported} contacts locally`);
-      } catch (error) {
-        console.warn('[BackgroundSync] Contact sync failed:', error);
-      }
-
-      // Sync Gmail Interactions - Device-Only Processing
-      try {
-        console.log('[BackgroundSync] Detecting interactions from Gmail (device-only)...');
-        const messages = await googleAPI.fetchGmailMessages(50);
-        interactionsDetected = await this.processEmailInteractions(messages);
-        console.log(`[BackgroundSync] Detected ${interactionsDetected} interactions locally`);
-      } catch (error) {
-        console.warn('[BackgroundSync] Gmail sync failed:', error);
-      }
-
-      // Sync Calendar Events - Device-Only Meeting Detection
-      try {
-        console.log('[BackgroundSync] Processing calendar events (device-only)...');
-        const timeMin = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        const timeMax = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-        const events = await googleAPI.fetchCalendarEvents(timeMin, timeMax);
-        const meetingTasks = await this.processCalendarEvents(events);
-        tasksCreated += meetingTasks;
-        console.log(`[BackgroundSync] Created ${meetingTasks} meeting tasks locally`);
-      } catch (error) {
-        console.warn('[BackgroundSync] Calendar sync failed:', error);
-      }
-
-      this.lastSyncTime = new Date();
-      console.log('[BackgroundSync] Background sync completed successfully');
+      // Run Gmail sync first
+      console.log('[BackgroundSyncJob] Step 1: Gmail delta sync');
+      const gmailResult = await taskManager.runGmailDeltaSync();
+      
+      // Run scoring after Gmail sync
+      console.log('[BackgroundSyncJob] Step 2: Score computation');
+      const scoreResult = await taskManager.runIndexAndScore();
+      
+      const success = gmailResult.success && scoreResult.success;
+      
+      console.log(`[BackgroundSyncJob] Complete sync finished - Success: ${success}`);
       
       return {
-        success: true,
-        contactsImported,
-        interactionsDetected,
-        tasksCreated
+        success,
+        gmailResult,
+        scoreResult,
+        error: success ? undefined : 'One or more sync steps failed'
       };
     } catch (error) {
-      console.error('[BackgroundSync] Background sync failed:', error);
+      console.error('[BackgroundSyncJob] Complete sync failed:', error);
       return {
         success: false,
-        contactsImported: 0,
-        interactionsDetected: 0,
-        tasksCreated: 0,
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     } finally {
@@ -131,136 +81,58 @@ export class BackgroundSyncJob {
   }
 
   /**
-   * Import Contacts - Local Processing Only
+   * Run Quick Sync (Gmail only)
+   * 
+   * For frequent background updates - just sync new emails
    */
-  private async importContacts(contacts: any[]): Promise<number> {
-    const personRepo = new PersonRepository();
-    let imported = 0;
-
-    for (const contact of contacts) {
-      try {
-        // Check if contact already exists
-        const existing = await personRepo.findByEmail(contact.email);
-        if (existing) continue;
-
-        // Create new person from contact data
-        const [firstName, ...lastNameParts] = contact.name.split(' ');
-        const lastName = lastNameParts.join(' ') || '';
-
-        await personRepo.createPerson({
-          firstName,
-          lastName,
-          email: contact.email,
-          phone: contact.phone,
-          relationship: 'acquaintance',
-          tags: ['imported'],
-          notes: 'Imported from Google Contacts'
-        });
-
-        imported++;
-      } catch (error) {
-        console.warn(`[BackgroundSync] Failed to import contact ${contact.name}:`, error);
-      }
+  async runQuickSync(): Promise<{ success: boolean; error?: string }> {
+    if (this.isRunning) {
+      console.log('[BackgroundSyncJob] Quick sync skipped - sync in progress');
+      return { success: false, error: 'Sync already running' };
     }
 
-    return imported;
-  }
+    console.log('[BackgroundSyncJob] Starting quick Gmail sync...');
+    this.isRunning = true;
 
-  /**
-   * Process Email Interactions - Local Analysis Only
-   */
-  private async processEmailInteractions(messages: any[]): Promise<number> {
-    const personRepo = new PersonRepository();
-    const interactionRepo = new InteractionRepository();
-    let detected = 0;
-
-    for (const message of messages) {
-      try {
-        // Find person by email
-        const person = await personRepo.findByEmail(message.from);
-        if (!person) continue;
-
-        // Check if interaction already exists
-        const messageDate = new Date(message.date);
-        const existing = await interactionRepo.findByPersonAndDate(person.id, messageDate);
-        if (existing) continue;
-
-        // Create interaction record
-        await interactionRepo.createInteraction({
-          personId: person.id,
-          type: 'email',
-          date: messageDate,
-          notes: `Email: ${message.subject}`,
-        });
-
-        detected++;
-      } catch (error) {
-        console.warn(`[BackgroundSync] Failed to process email interaction:`, error);
-      }
+    try {
+      const taskManager = BackgroundTaskManager.getInstance();
+      const result = await taskManager.runGmailDeltaSync();
+      
+      console.log(`[BackgroundSyncJob] Quick sync finished - Success: ${result.success}`);
+      return result;
+    } catch (error) {
+      console.error('[BackgroundSyncJob] Quick sync failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    } finally {
+      this.isRunning = false;
     }
-
-    return detected;
   }
 
   /**
-   * Process Calendar Events - Local Meeting Detection
-   */
-  private async processCalendarEvents(events: any[]): Promise<number> {
-    const taskRepo = new TaskRepository();
-    let created = 0;
-
-    for (const event of events) {
-      try {
-        // Skip events without attendees
-        if (!event.attendees || event.attendees.length === 0) continue;
-
-        // Create follow-up task for meetings
-        const eventDate = new Date(event.start.dateTime);
-        const followUpDate = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000); // Next day
-
-        await taskRepo.createTask({
-          title: `Follow up on: ${event.summary}`,
-          description: `Follow up on meeting with ${event.attendees.map((a: any) => a.email).join(', ')}`,
-          dueDate: followUpDate,
-          completed: false,
-          type: 'follow-up'
-        });
-
-        created++;
-      } catch (error) {
-        console.warn(`[BackgroundSync] Failed to process calendar event:`, error);
-      }
-    }
-
-    return created;
-  }
-
-  /**
-   * Get Last Sync Time
-   */
-  getLastSyncTime(): Date | null {
-    return this.lastSyncTime;
-  }
-
-  /**
-   * Check if Sync is Running
+   * Check if any sync is currently running
    */
   isSyncRunning(): boolean {
     return this.isRunning;
   }
 
   /**
-   * Schedule Background Sync (Platform-Specific)
+   * Get sync status with timing information
    */
-  async scheduleBackgroundSync(): Promise<void> {
-    if (Platform.OS === 'web') {
-      // Web: Use service worker or periodic sync (if available)
-      console.log('[BackgroundSync] Web background sync not implemented');
-      return;
-    }
-
-    // Mobile: Use expo-background-fetch or expo-task-manager
-    console.log('[BackgroundSync] Mobile background sync scheduling not implemented');
-    // Implementation would use expo-background-fetch for periodic sync
+  async getSyncStatus() {
+    const taskManager = BackgroundTaskManager.getInstance();
+    const taskStatus = await taskManager.getTaskStatus();
+    
+    return {
+      isRunning: this.isRunning,
+      lastGmailSync: taskStatus.gmailSync.lastRun,
+      lastScoreUpdate: taskStatus.indexScore.lastRun,
+      nextGmailSync: taskStatus.gmailSync.nextRun,
+      nextScoreUpdate: taskStatus.indexScore.nextRun,
+      gmailRegistered: taskStatus.gmailSync.isRegistered,
+      scoreRegistered: taskStatus.indexScore.isRegistered,
+    };
   }
 }

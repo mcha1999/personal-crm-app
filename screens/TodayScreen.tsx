@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Animated, TouchableOpacity, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { RefreshCw } from 'lucide-react-native';
 import { PersonDAO } from '@/database/PersonDAO';
 import { TaskDAO } from '@/database/TaskDAO';
 import { PersonScoreDAO } from '@/database/PersonScoreDAO';
@@ -12,9 +13,11 @@ import { PersonScore } from '@/models/PersonScore';
 import { GradientHeader } from '@/components/GradientHeader';
 import { theme } from '@/constants/theme';
 import { ScoreJob } from '@/jobs/ScoreJob';
+import { BackgroundTaskManager } from '@/services/BackgroundTaskManager';
 
 export const TodayScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
   const [birthdayPeople, setBirthdayPeople] = useState<Person[]>([]);
   const [peopleToReachOut, setPeopleToReachOut] = useState<Person[]>([]);
@@ -105,6 +108,46 @@ export const TodayScreen: React.FC = () => {
     setRefreshing(false);
   };
 
+  const onManualRefresh = async () => {
+    if (manualRefreshing) return;
+    
+    setManualRefreshing(true);
+    try {
+      const taskManager = BackgroundTaskManager.getInstance();
+      const result = await taskManager.manualRefresh();
+      
+      // Reload data after background tasks complete
+      await loadData();
+      
+      // Show results
+      const gmailSuccess = result.gmailResult.success;
+      const scoreSuccess = result.scoreResult.success;
+      
+      if (gmailSuccess && scoreSuccess) {
+        Alert.alert(
+          'Refresh Complete',
+          `Gmail sync: ${gmailSuccess ? 'Success' : 'Failed'}\nScoring: ${scoreSuccess ? `${result.scoreResult.scoresComputed} contacts updated` : 'Failed'}`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        const errors = [];
+        if (!gmailSuccess) errors.push(`Gmail: ${result.gmailResult.error || 'Unknown error'}`);
+        if (!scoreSuccess) errors.push(`Scoring: ${result.scoreResult.error || 'Unknown error'}`);
+        
+        Alert.alert(
+          'Refresh Completed with Issues',
+          errors.join('\n'),
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Manual refresh failed:', error);
+      Alert.alert('Refresh Failed', 'Could not complete manual refresh');
+    } finally {
+      setManualRefreshing(false);
+    }
+  };
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -114,14 +157,31 @@ export const TodayScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <GradientHeader
-        title={getGreeting()}
-        subtitle={new Date().toLocaleDateString('en-US', { 
-          weekday: 'long', 
-          month: 'long', 
-          day: 'numeric' 
-        })}
-      />
+      <View style={styles.headerContainer}>
+        <GradientHeader
+          title={getGreeting()}
+          subtitle={new Date().toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            month: 'long', 
+            day: 'numeric' 
+          })}
+        />
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={onManualRefresh}
+          disabled={manualRefreshing}
+          activeOpacity={0.7}
+        >
+          <RefreshCw 
+            size={20} 
+            color={manualRefreshing ? '#95A5A6' : '#FFFFFF'} 
+            style={[styles.refreshIcon, manualRefreshing && styles.refreshIconSpinning]}
+          />
+          <Text style={[styles.refreshText, manualRefreshing && styles.refreshTextDisabled]}>
+            {manualRefreshing ? 'Refreshing...' : 'Refresh Now'}
+          </Text>
+        </TouchableOpacity>
+      </View>
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -195,6 +255,36 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  headerContainer: {
+    position: 'relative',
+  },
+  refreshButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  refreshIcon: {
+    marginRight: 6,
+  },
+  refreshIconSpinning: {
+    opacity: 0.6,
+  },
+  refreshText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  refreshTextDisabled: {
+    color: '#95A5A6',
   },
   section: {
     marginTop: theme.spacing.lg,

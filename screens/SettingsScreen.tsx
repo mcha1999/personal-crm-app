@@ -34,8 +34,7 @@ export const SettingsScreen: React.FC = () => {
   const [reminders, setReminders] = React.useState(true);
   const [googleAPIEnabled, setGoogleAPIEnabled] = React.useState(false);
   const [isGoogleAuthenticated, setIsGoogleAuthenticated] = React.useState(false);
-  const [nextSyncTime, setNextSyncTime] = React.useState<Date | null>(null);
-  const [nextScoreTime, setNextScoreTime] = React.useState<Date | null>(null);
+  const [taskStatus, setTaskStatus] = React.useState<any>(null);
   const [supportedAuthTypes, setSupportedAuthTypes] = React.useState<LocalAuthentication.AuthenticationType[]>([]);
   const [isCalendarImporting, setIsCalendarImporting] = React.useState(false);
   const [lastCalendarImport, setLastCalendarImport] = React.useState<Date | null>(null);
@@ -48,9 +47,13 @@ export const SettingsScreen: React.FC = () => {
   const { database, isInitialized } = useDatabase();
 
   useEffect(() => {
-    const taskManager = BackgroundTaskManager.getInstance();
-    setNextSyncTime(taskManager.getNextGmailSyncTime());
-    setNextScoreTime(taskManager.getNextIndexScoreTime());
+    const loadTaskStatus = async () => {
+      const taskManager = BackgroundTaskManager.getInstance();
+      const status = await taskManager.getTaskStatus();
+      setTaskStatus(status);
+    };
+    
+    loadTaskStatus();
 
     // Check Google API authentication status
     const checkGoogleAuth = async () => {
@@ -83,8 +86,7 @@ export const SettingsScreen: React.FC = () => {
     checkAuthTypes();
 
     const interval = setInterval(() => {
-      setNextSyncTime(taskManager.getNextGmailSyncTime());
-      setNextScoreTime(taskManager.getNextIndexScoreTime());
+      loadTaskStatus();
     }, 60000);
 
     return () => clearInterval(interval);
@@ -100,11 +102,35 @@ export const SettingsScreen: React.FC = () => {
     
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
     
+    if (days > 0) {
+      return `in ${days}d ${hours % 24}h`;
+    }
     if (hours > 0) {
       return `in ${hours}h ${minutes % 60}m`;
     }
     return `in ${minutes}m`;
+  };
+
+  const formatLastRunTime = (date: Date): string => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) {
+      return `${days}d ago`;
+    }
+    if (hours > 0) {
+      return `${hours}h ago`;
+    }
+    if (minutes > 0) {
+      return `${minutes}m ago`;
+    }
+    return 'Just now';
   };
 
   const handleGoogleAPIToggle = async (enabled: boolean) => {
@@ -142,16 +168,19 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const handleManualSync = async () => {
-    if (!googleAPIEnabled) {
-      Alert.alert('Google API Disabled', 'Please enable Google API integration first.');
-      return;
-    }
-    
     try {
       const taskManager = BackgroundTaskManager.getInstance();
-      await taskManager.runGmailDeltaSync();
-      Alert.alert('Success', 'Gmail sync completed (all processing local)');
-      setNextSyncTime(taskManager.getNextGmailSyncTime());
+      const result = await taskManager.runGmailDeltaSync();
+      
+      if (result.success) {
+        Alert.alert('Success', 'Gmail sync completed (all processing local)');
+      } else {
+        Alert.alert('Gmail Sync Failed', result.error || 'Unknown error');
+      }
+      
+      // Refresh task status
+      const status = await taskManager.getTaskStatus();
+      setTaskStatus(status);
     } catch (error) {
       Alert.alert('Error', 'Failed to sync Gmail');
     }
@@ -160,9 +189,17 @@ export const SettingsScreen: React.FC = () => {
   const handleManualScore = async () => {
     try {
       const taskManager = BackgroundTaskManager.getInstance();
-      await taskManager.runIndexAndScore();
-      Alert.alert('Success', 'Scoring completed');
-      setNextScoreTime(taskManager.getNextIndexScoreTime());
+      const result = await taskManager.runIndexAndScore();
+      
+      if (result.success) {
+        Alert.alert('Success', `Scoring completed. Updated ${result.scoresComputed} contacts.`);
+      } else {
+        Alert.alert('Scoring Failed', result.error || 'Unknown error');
+      }
+      
+      // Refresh task status
+      const status = await taskManager.getTaskStatus();
+      setTaskStatus(status);
     } catch (error) {
       Alert.alert('Error', 'Failed to update scores');
     }
@@ -497,16 +534,16 @@ export const SettingsScreen: React.FC = () => {
           onPress: googleAPIEnabled ? showGoogleScopeInfo : () => {},
         },
         {
-          icon: <RefreshCw size={20} color={googleAPIEnabled ? "#007AFF" : "#95A5A6"} />,
-          label: 'Gmail Sync',
-          subtitle: googleAPIEnabled ? `Next run: ${formatNextRunTime(nextSyncTime)}` : 'Requires Google API',
+          icon: <RefreshCw size={20} color={taskStatus?.gmailSync?.isRegistered ? "#007AFF" : "#95A5A6"} />,
+          label: 'Manual Gmail Sync',
+          subtitle: taskStatus ? `Last: ${taskStatus.gmailSync.lastRun ? formatLastRunTime(taskStatus.gmailSync.lastRun) : 'Never'} • Next: ${formatNextRunTime(taskStatus.gmailSync.nextRun)}` : 'Loading...',
           type: 'action',
           onPress: handleManualSync,
         },
         {
           icon: <Brain size={20} color="#9B59B6" />,
-          label: 'Index & Score',
-          subtitle: `Next run: ${formatNextRunTime(nextScoreTime)} (local processing)`,
+          label: 'Manual Index & Score',
+          subtitle: taskStatus ? `Last: ${taskStatus.indexScore.lastRun ? formatLastRunTime(taskStatus.indexScore.lastRun) : 'Never'} • Next: ${formatNextRunTime(taskStatus.indexScore.nextRun)}` : 'Loading...',
           type: 'action',
           onPress: handleManualScore,
         },

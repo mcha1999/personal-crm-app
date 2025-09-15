@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ContactsContext } from "@/contexts/ContactsContext";
 import { AuthScreen } from "@/components/AuthScreen";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
+import { BackgroundTaskManager } from "@/services/BackgroundTaskManager";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -28,6 +29,19 @@ function AppContent() {
   useEffect(() => {
     if (isInitialized && !authLoading) {
       SplashScreen.hideAsync();
+      
+      // Initialize background tasks when app is ready
+      const initBackgroundTasks = async () => {
+        try {
+          const taskManager = BackgroundTaskManager.getInstance();
+          await taskManager.scheduleBackgroundTasks();
+          console.log('[App] Background tasks initialized');
+        } catch (error) {
+          console.error('[App] Failed to initialize background tasks:', error);
+        }
+      };
+      
+      initBackgroundTasks();
     }
   }, [isInitialized, authLoading]);
 
