@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield, Upload, FileText, Users, Calendar as CalendarIcon, Mail, Calculator } from 'lucide-react-native';
+import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield, Upload, FileText, Users, Calendar as CalendarIcon, Mail, Calculator, Cpu } from 'lucide-react-native';
 import { BackgroundTaskManager } from '../services/BackgroundTaskManager';
 import { GoogleAPIService } from '../services/GoogleAPIService';
 import { LocalExport } from '../database/LocalExport';
@@ -583,6 +583,18 @@ export const SettingsScreen: React.FC = () => {
           type: 'switch',
           value: isAuthEnabled,
           onValueChange: handleAuthToggle,
+        },
+      ],
+    },
+    {
+      title: 'AI Services (Beta)',
+      items: [
+        {
+          icon: <Cpu size={20} color="#9B59B6" />,
+          label: 'AI Service Demo',
+          subtitle: 'Test thread summary, follow-up detection, and prep pack generation',
+          type: 'action',
+          onPress: () => router.push('/ai-demo'),
         },
       ],
     },
