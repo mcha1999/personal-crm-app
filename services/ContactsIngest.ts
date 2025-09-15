@@ -12,8 +12,18 @@ interface ContactData {
 export class ContactsIngest {
   private personDAO: PersonDAO;
 
-  constructor(personDAO: PersonDAO) {
-    this.personDAO = personDAO;
+  constructor(personDAO?: PersonDAO) {
+    this.personDAO = personDAO || new PersonDAO();
+  }
+
+  async requestPermissions(): Promise<boolean> {
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      return status === 'granted';
+    } catch (error) {
+      console.error('Error requesting contacts permissions:', error);
+      return false;
+    }
   }
 
   async run(): Promise<{ imported: number; updated: number; skipped: number }> {
