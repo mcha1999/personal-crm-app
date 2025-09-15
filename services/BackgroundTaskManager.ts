@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
-import { GmailSync } from './GmailSync';
+// import { GmailSync } from './GmailSync'; // Conditionally imported when needed
 import { ScoreJob } from '@/jobs/ScoreJob';
 import { FollowUpService } from './FollowUpService';
 
@@ -138,6 +138,13 @@ export class BackgroundTaskManager {
     console.log('[BackgroundTask] Starting Gmail delta sync (device-only)...');
     
     try {
+      const { ENABLE_GOOGLE_OAUTH } = await import('@/src/flags');
+      if (!ENABLE_GOOGLE_OAUTH) {
+        console.log('[BackgroundTask] Google OAuth is disabled, skipping Gmail sync');
+        return { success: false, error: 'Google OAuth disabled' };
+      }
+
+      const { GmailSync } = await import('./GmailSync');
       const gmailSync = GmailSync.getInstance();
       
       // Check if authenticated

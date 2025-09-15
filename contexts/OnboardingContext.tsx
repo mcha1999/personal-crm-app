@@ -4,7 +4,7 @@ import * as Contacts from 'expo-contacts';
 import * as Calendar from 'expo-calendar';
 import { Platform } from 'react-native';
 import createContextHook from '@nkzw/create-context-hook';
-import { GmailSync } from '@/services/GmailSync';
+// import { GmailSync } from '@/services/GmailSync'; // Disabled for now
 
 const ONBOARDING_COMPLETED_KEY = 'kin_onboarding_completed';
 const SYNC_PREFERENCES_KEY = 'kin_sync_preferences';

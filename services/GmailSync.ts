@@ -9,13 +9,17 @@ let WebBrowser: any;
 let SecureStore: any;
 
 if (ENABLE_GOOGLE_OAUTH) {
-  // Only import when feature is enabled
-  AuthSession = require('expo-auth-session');
-  WebBrowser = require('expo-web-browser');
-  SecureStore = require('expo-secure-store');
-  
-  // Ensure web browser sessions complete properly
-  WebBrowser.maybeCompleteAuthSession();
+  try {
+    // Only import when feature is enabled
+    AuthSession = require('expo-auth-session');
+    WebBrowser = require('expo-web-browser');
+    SecureStore = require('expo-secure-store');
+    
+    // Ensure web browser sessions complete properly
+    WebBrowser.maybeCompleteAuthSession();
+  } catch (error) {
+    console.warn('[GmailSync] Google OAuth dependencies not available:', error);
+  }
 }
 
 
@@ -89,6 +93,11 @@ export class GmailSync {
       return;
     }
 
+    if (!AuthSession) {
+      console.log('[GmailSync] AuthSession not available');
+      return;
+    }
+
     // Generate redirect URI for OAuth
     // For Expo Go: uses auth.expo.io proxy
     // For standalone apps: uses your app's custom scheme
@@ -116,6 +125,11 @@ export class GmailSync {
   async authenticate(): Promise<boolean> {
     if (!ENABLE_GOOGLE_OAUTH) {
       console.log('[GmailSync] Google OAuth is disabled');
+      return false;
+    }
+
+    if (!AuthSession) {
+      console.log('[GmailSync] AuthSession not available');
       return false;
     }
 
@@ -210,7 +224,7 @@ export class GmailSync {
       const sanitizedAccessToken = accessToken.trim();
       const sanitizedRefreshToken = refreshToken?.trim() || '';
 
-      if (Platform.OS !== 'web') {
+      if (Platform.OS !== 'web' && SecureStore) {
         await SecureStore.setItemAsync('gmail_access_token', sanitizedAccessToken);
         if (sanitizedRefreshToken) {
           await SecureStore.setItemAsync('gmail_refresh_token', sanitizedRefreshToken);
@@ -236,7 +250,7 @@ export class GmailSync {
       let accessToken: string | null = null;
       let refreshToken: string | null = null;
 
-      if (Platform.OS !== 'web') {
+      if (Platform.OS !== 'web' && SecureStore) {
         accessToken = await SecureStore.getItemAsync('gmail_access_token');
         refreshToken = await SecureStore.getItemAsync('gmail_refresh_token');
       } else {
@@ -255,6 +269,11 @@ export class GmailSync {
    * Refresh Access Token
    */
   private async refreshAccessToken(): Promise<string | null> {
+    if (!AuthSession) {
+      console.log('[GmailSync] AuthSession not available');
+      return null;
+    }
+
     try {
       const { refreshToken } = await this.getStoredTokens();
       if (!refreshToken) {
@@ -599,7 +618,7 @@ export class GmailSync {
    */
   private async storeHistoryId(historyId: string): Promise<void> {
     try {
-      if (Platform.OS !== 'web') {
+      if (Platform.OS !== 'web' && SecureStore) {
         await SecureStore.setItemAsync('gmail_history_id', historyId);
       } else {
         localStorage.setItem('gmail_history_id', historyId);
@@ -614,7 +633,7 @@ export class GmailSync {
    */
   private async getStoredHistoryId(): Promise<string | null> {
     try {
-      if (Platform.OS !== 'web') {
+      if (Platform.OS !== 'web' && SecureStore) {
         return await SecureStore.getItemAsync('gmail_history_id');
       } else {
         return localStorage.getItem('gmail_history_id');
@@ -630,7 +649,7 @@ export class GmailSync {
    */
   private async clearStoredHistoryId(): Promise<void> {
     try {
-      if (Platform.OS !== 'web') {
+      if (Platform.OS !== 'web' && SecureStore) {
         await SecureStore.deleteItemAsync('gmail_history_id');
       } else {
         localStorage.removeItem('gmail_history_id');
@@ -662,7 +681,7 @@ export class GmailSync {
     }
 
     try {
-      if (Platform.OS !== 'web') {
+      if (Platform.OS !== 'web' && SecureStore) {
         await SecureStore.deleteItemAsync('gmail_access_token');
         await SecureStore.deleteItemAsync('gmail_refresh_token');
         await SecureStore.deleteItemAsync('gmail_history_id');

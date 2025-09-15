@@ -8,7 +8,11 @@ import { ENABLE_GOOGLE_OAUTH } from '../src/flags';
 
 let GoogleAPIService: any;
 if (ENABLE_GOOGLE_OAUTH) {
-  GoogleAPIService = require('../services/GoogleAPIService').GoogleAPIService;
+  try {
+    GoogleAPIService = require('../services/GoogleAPIService').GoogleAPIService;
+  } catch (error) {
+    console.warn('[SettingsScreen] GoogleAPIService not available:', error);
+  }
 }
 import { LocalExport } from '../database/LocalExport';
 import { Database } from '../database/Database';
@@ -70,16 +74,22 @@ export const SettingsScreen: React.FC = () => {
 
     // Check Google API authentication status
     const checkGoogleAuth = async () => {
-      if (!ENABLE_GOOGLE_OAUTH) {
+      if (!ENABLE_GOOGLE_OAUTH || !GoogleAPIService) {
         setIsGoogleAuthenticated(false);
         setGoogleAPIEnabled(false);
         return;
       }
 
-      const googleAPI = GoogleAPIService.getInstance();
-      const authenticated = await googleAPI.isAuthenticated();
-      setIsGoogleAuthenticated(authenticated);
-      setGoogleAPIEnabled(authenticated);
+      try {
+        const googleAPI = GoogleAPIService.getInstance();
+        const authenticated = await googleAPI.isAuthenticated();
+        setIsGoogleAuthenticated(authenticated);
+        setGoogleAPIEnabled(authenticated);
+      } catch (error) {
+        console.warn('[SettingsScreen] Error checking Google auth:', error);
+        setIsGoogleAuthenticated(false);
+        setGoogleAPIEnabled(false);
+      }
     };
     
 
@@ -142,41 +152,46 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const handleGoogleAPIToggle = async (enabled: boolean) => {
-    if (!ENABLE_GOOGLE_OAUTH) {
+    if (!ENABLE_GOOGLE_OAUTH || !GoogleAPIService) {
       Alert.alert('Feature Disabled', 'Google OAuth integration is disabled in this build.');
       return;
     }
 
-    if (enabled) {
-      // Enable Google API - authenticate
-      const googleAPI = GoogleAPIService.getInstance();
-      const success = await googleAPI.authenticate();
-      if (success) {
-        setGoogleAPIEnabled(true);
-        setIsGoogleAuthenticated(true);
-        Alert.alert('Google API Enabled', 'You can now sync with Gmail, Contacts, and Calendar. All processing happens locally on your device.');
+    try {
+      if (enabled) {
+        // Enable Google API - authenticate
+        const googleAPI = GoogleAPIService.getInstance();
+        const success = await googleAPI.authenticate();
+        if (success) {
+          setGoogleAPIEnabled(true);
+          setIsGoogleAuthenticated(true);
+          Alert.alert('Google API Enabled', 'You can now sync with Gmail, Contacts, and Calendar. All processing happens locally on your device.');
+        } else {
+          Alert.alert('Authentication Failed', 'Could not authenticate with Google.');
+        }
       } else {
-        Alert.alert('Authentication Failed', 'Could not authenticate with Google.');
-      }
-    } else {
-      // Disable Google API - sign out
-      Alert.alert(
-        'Disable Google API',
-        'This will remove Google authentication and disable sync features. Your local data will remain intact.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Disable',
-            style: 'destructive',
-            onPress: async () => {
-              const googleAPI = GoogleAPIService.getInstance();
-              await googleAPI.signOut();
-              setGoogleAPIEnabled(false);
-              setIsGoogleAuthenticated(false);
+        // Disable Google API - sign out
+        Alert.alert(
+          'Disable Google API',
+          'This will remove Google authentication and disable sync features. Your local data will remain intact.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Disable',
+              style: 'destructive',
+              onPress: async () => {
+                const googleAPI = GoogleAPIService.getInstance();
+                await googleAPI.signOut();
+                setGoogleAPIEnabled(false);
+                setIsGoogleAuthenticated(false);
+              }
             }
-          }
-        ]
-      );
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('[SettingsScreen] Google API toggle error:', error);
+      Alert.alert('Error', 'Failed to toggle Google API integration.');
     }
   };
 
