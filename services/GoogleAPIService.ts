@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { GmailSync } from './GmailSync';
 
 
 /**
@@ -42,32 +43,24 @@ export class GoogleAPIService {
    * Authenticate with Google - Device-Only OAuth
    * 
    * Privacy Implementation:
-   * - Uses standard OAuth 2.0 flow directly with Google
+   * - Uses OAuth 2.0 with PKCE for secure authentication
+   * - Direct OAuth flow with Google (no proxy)
    * - Tokens stored in device secure storage only
-   * - No authentication proxy or backend service
    */
   async authenticate(): Promise<boolean> {
     try {
       console.log('[GoogleAPI] Starting device-only OAuth authentication...');
       
-      // PRIVACY: This is a stub implementation
-      // Real implementation would:
-      // 1. Use expo-auth-session for OAuth 2.0 flow
-      // 2. Redirect to Google OAuth directly (no proxy)
-      // 3. Store access/refresh tokens in Expo SecureStore
-      // 4. Never transmit tokens to external services
+      const gmailSync = GmailSync.getInstance();
+      const success = await gmailSync.authenticate();
       
-      if (Platform.OS === 'web') {
-        console.log('[GoogleAPI] Web OAuth flow would use expo-auth-session');
-      } else {
-        console.log('[GoogleAPI] Native OAuth flow would use expo-auth-session');
+      if (success) {
+        // Store a flag to indicate Google services are authenticated
+        await this.storeTokens('authenticated', 'authenticated');
+        console.log('[GoogleAPI] Authentication successful (tokens stored locally)');
       }
       
-      // Simulate successful authentication
-      await this.storeTokens('mock_access_token', 'mock_refresh_token');
-      
-      console.log('[GoogleAPI] Authentication successful (tokens stored locally)');
-      return true;
+      return success;
     } catch (error) {
       console.error('[GoogleAPI] Authentication failed:', error);
       return false;
@@ -146,45 +139,18 @@ export class GoogleAPIService {
     console.log('[GoogleAPI] Fetching Gmail messages (device-only processing)...');
     
     try {
-      const { accessToken } = await this.getStoredTokens();
-      if (!accessToken) {
-        throw new Error('No access token available');
+      const gmailSync = GmailSync.getInstance();
+      const isAuthenticated = await gmailSync.isAuthenticated();
+      
+      if (!isAuthenticated) {
+        throw new Error('Gmail not authenticated');
       }
 
-      // PRIVACY: This is a stub implementation
-      // Real implementation would:
-      // 1. Make direct HTTPS calls to Gmail API
-      // 2. Process email headers locally to extract sender/recipient
-      // 3. Identify interactions with known contacts
-      // 4. Store interaction data in local SQLite database
-      // 5. Never transmit email content externally
+      // Perform initial seed or delta sync
+      const result = await gmailSync.seed(maxResults);
       
-      console.log('[GoogleAPI] Processing email metadata locally...');
-      
-      // Simulate local processing
-      const mockMessages = [
-        {
-          id: 'msg1',
-          threadId: 'thread1',
-          from: 'sarah@example.com',
-          to: 'user@example.com',
-          subject: 'Coffee catch-up',
-          date: new Date().toISOString(),
-          snippet: 'Looking forward to our coffee meeting...'
-        },
-        {
-          id: 'msg2',
-          threadId: 'thread2',
-          from: 'mike@example.com',
-          to: 'user@example.com',
-          subject: 'Project update',
-          date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          snippet: 'Here are the latest project files...'
-        }
-      ];
-
-      console.log(`[GoogleAPI] Processed ${mockMessages.length} messages locally`);
-      return mockMessages;
+      console.log(`[GoogleAPI] Processed ${result.messages.length} messages locally`);
+      return result.messages;
     } catch (error) {
       console.error('[GoogleAPI] Failed to fetch Gmail messages:', error);
       throw error;
@@ -293,8 +259,13 @@ export class GoogleAPIService {
    * Check Authentication Status
    */
   async isAuthenticated(): Promise<boolean> {
-    const { accessToken } = await this.getStoredTokens();
-    return accessToken !== null;
+    try {
+      const gmailSync = GmailSync.getInstance();
+      return await gmailSync.isAuthenticated();
+    } catch (error) {
+      console.error('[GoogleAPI] Failed to check authentication:', error);
+      return false;
+    }
   }
 
   /**
@@ -307,6 +278,10 @@ export class GoogleAPIService {
    */
   async signOut(): Promise<void> {
     try {
+      const gmailSync = GmailSync.getInstance();
+      await gmailSync.signOut();
+      
+      // Clean up our own tokens
       if (Platform.OS !== 'web') {
         await SecureStore.deleteItemAsync('google_access_token');
         await SecureStore.deleteItemAsync('google_refresh_token');
@@ -322,6 +297,31 @@ export class GoogleAPIService {
   }
 
   /**
+   * Sync Gmail Data - Initial or Delta
+   */
+  async syncGmail(maxResults?: number): Promise<{ threads: any[]; messages: any[]; interactions: any[] }> {
+    try {
+      const gmailSync = GmailSync.getInstance();
+      const isAuthenticated = await gmailSync.isAuthenticated();
+      
+      if (!isAuthenticated) {
+        throw new Error('Gmail not authenticated');
+      }
+
+      // Try delta sync first, fallback to seed if needed
+      try {
+        return await gmailSync.delta();
+      } catch (error) {
+        console.log('[GoogleAPI] Delta sync failed, performing full seed');
+        return await gmailSync.seed(maxResults);
+      }
+    } catch (error) {
+      console.error('[GoogleAPI] Gmail sync failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get Privacy Status - Transparency Information
    */
   getPrivacyStatus() {
@@ -332,7 +332,8 @@ export class GoogleAPIService {
       tokenStorage: 'device-secure-store',
       processing: 'local-only',
       scopes: this.scopes,
-      compliance: 'privacy-first'
+      compliance: 'privacy-first',
+      gmailIntegration: 'oauth-pkce'
     };
   }
 }

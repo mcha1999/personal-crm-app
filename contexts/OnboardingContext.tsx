@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Contacts from 'expo-contacts';
 import * as Calendar from 'expo-calendar';
-import * as AuthSession from 'expo-auth-session';
 import { Platform } from 'react-native';
 import createContextHook from '@nkzw/create-context-hook';
+import { GmailSync } from '@/services/GmailSync';
 
 const ONBOARDING_COMPLETED_KEY = 'kin_onboarding_completed';
 const SYNC_PREFERENCES_KEY = 'kin_sync_preferences';
@@ -214,22 +214,21 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
       console.log('[Onboarding] Connecting to Gmail...');
       setStepInProgress('gmail');
       
-      // For now, we'll simulate the OAuth flow
-      // In a real implementation, you would use expo-auth-session with Google OAuth
+      const gmailSync = GmailSync.getInstance();
+      const success = await gmailSync.authenticate();
       
-      // Simulate OAuth delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // For demo purposes, we'll mark as connected
-      setSyncPreferences(prev => ({ 
-        ...prev, 
-        gmailEnabled: true,
-        gmailAccessToken: 'demo_access_token',
-        gmailRefreshToken: 'demo_refresh_token'
-      }));
-      
-      completeStep('gmail');
-      return true;
+      if (success) {
+        setSyncPreferences(prev => ({ 
+          ...prev, 
+          gmailEnabled: true
+        }));
+        
+        completeStep('gmail');
+        return true;
+      } else {
+        setStepError('gmail', 'Gmail authentication was cancelled or failed. You can set this up later in Settings.');
+        return false;
+      }
     } catch (error) {
       console.error('[Onboarding] Error connecting Gmail:', error);
       setStepError('gmail', 'Failed to connect Gmail. You can set this up later in Settings.');
