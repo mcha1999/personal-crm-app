@@ -49,7 +49,7 @@ export class GmailSync {
   
   // OAuth Configuration - Device-Only
   private readonly clientId = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
-  private readonly redirectUri = AuthSession.makeRedirectUri();
+  private redirectUri: string = '';
   private readonly scopes = [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.metadata'
@@ -57,7 +57,9 @@ export class GmailSync {
   
   private readonly baseUrl = 'https://gmail.googleapis.com/gmail/v1';
   
-  private constructor() {}
+  private constructor() {
+    this.redirectUri = AuthSession.makeRedirectUri();
+  }
 
   static getInstance(): GmailSync {
     if (!GmailSync.instance) {
