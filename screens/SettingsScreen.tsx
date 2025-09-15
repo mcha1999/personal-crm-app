@@ -42,6 +42,7 @@ export const SettingsScreen: React.FC = () => {
   const [isGmailSyncing, setIsGmailSyncing] = React.useState<boolean>(false);
   const [lastGmailSync, setLastGmailSync] = React.useState<Date | null>(null);
   const [isGmailAuthenticated, setIsGmailAuthenticated] = React.useState<boolean>(false);
+  const [healthTapCount, setHealthTapCount] = React.useState(0);
   
   const { isAuthEnabled, enableAuth, disableAuth, getSupportedAuthTypes } = useAuth();
   const { isImporting, lastImportResult, lastImportDate, error: contactsError, importContacts, clearError } = useContacts();
@@ -666,10 +667,23 @@ export const SettingsScreen: React.FC = () => {
     },
   ];
 
+  const handleTitleTap = () => {
+    setHealthTapCount(prev => prev + 1);
+    if (healthTapCount === 6) {
+      // Reset counter and navigate to health screen
+      setHealthTapCount(0);
+      router.push('/health');
+    }
+    // Reset counter after 2 seconds
+    setTimeout(() => setHealthTapCount(0), 2000);
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Settings</Text>
+        <TouchableOpacity onPress={handleTitleTap} activeOpacity={1}>
+          <Text style={styles.title}>Settings</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content}>
