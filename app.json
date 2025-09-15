@@ -28,12 +28,16 @@
         }
       },
       "infoPlist": {
-        "NSFaceIDUsageDescription": "Allow $(PRODUCT_NAME) to access your Face ID biometric data."
+        "NSFaceIDUsageDescription": "Allow $(PRODUCT_NAME) to access your Face ID biometric data.",
+        "NSContactsUsageDescription": "A message that tells the user why the app is requesting access to the user's contacts.",
+        "NSCalendarsUsageDescription": "Allow $(PRODUCT_NAME) to access your calendar",
+        "NSRemindersUsageDescription": "Allow $(PRODUCT_NAME) to access your reminders"
       },
       "config": {
         "usesNonExemptEncryption": false
       },
-      "usesIcloudStorage": true
+      "usesIcloudStorage": true,
+      "accessesContactNotes": true
     },
     "android": {
       "adaptiveIcon": {
@@ -46,7 +50,11 @@
         "WRITE_EXTERNAL_STORAGE",
         "INTERNET",
         "USE_BIOMETRIC",
-        "USE_FINGERPRINT"
+        "USE_FINGERPRINT",
+        "READ_CONTACTS",
+        "WRITE_CONTACTS",
+        "READ_CALENDAR",
+        "WRITE_CALENDAR"
       ]
     },
     "web": {
@@ -92,6 +100,18 @@
         "expo-document-picker",
         {
           "iCloudContainerEnvironment": "Production"
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow $(PRODUCT_NAME) to access your contacts."
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "The app needs to access your calendar."
         }
       ]
     ],
