@@ -29,9 +29,11 @@ export class Database {
         await this.runMigrations();
         await this.createTables();
         await this.seedInitialData();
+      } else {
+        console.log('[Database] Running on web platform - database disabled');
       }
     } catch (error) {
-      console.warn('SQLite initialization failed:', error);
+      console.warn('[Database] SQLite initialization failed:', error);
       // Continue without database on web
     }
   }
@@ -59,7 +61,7 @@ export class Database {
       }
       this.encryptionKey = key;
     } catch (error) {
-      console.warn('Encryption initialization failed:', error);
+      console.warn('[Database] Encryption initialization failed:', error);
       this.encryptionKey = null;
     }
   }
