@@ -1,10 +1,13 @@
 import { Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
+import * as Crypto from 'expo-crypto';
+import * as SecureStore from 'expo-secure-store';
 
 export class Database {
   private static instance: Database;
   private db: SQLite.SQLiteDatabase | null = null;
   private isWebPlatform = Platform.OS === 'web';
+  private encryptionKey: string | null = null;
 
   private constructor() {}
 
@@ -20,6 +23,7 @@ export class Database {
     
     try {
       if (!this.isWebPlatform) {
+        await this.initializeEncryption();
         this.db = await SQLite.openDatabaseAsync('kin.db');
         await this.createTables();
         await this.seedInitialData();
@@ -36,6 +40,46 @@ export class Database {
 
   isAvailable(): boolean {
     return this.db !== null;
+  }
+
+  private async initializeEncryption(): Promise<void> {
+    if (this.isWebPlatform) return;
+
+    try {
+      let key = await SecureStore.getItemAsync('kin_db_key');
+      if (!key) {
+        key = await Crypto.digestStringAsync(
+          Crypto.CryptoDigestAlgorithm.SHA256,
+          Math.random().toString(36) + Date.now().toString(36),
+          { encoding: Crypto.CryptoEncoding.HEX }
+        );
+        await SecureStore.setItemAsync('kin_db_key', key);
+      }
+      this.encryptionKey = key;
+    } catch (error) {
+      console.warn('Encryption initialization failed:', error);
+      this.encryptionKey = null;
+    }
+  }
+
+  async encryptData(data: string): Promise<string> {
+    if (!this.encryptionKey || this.isWebPlatform) return data;
+    
+    try {
+      const hash = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        this.encryptionKey + data,
+        { encoding: Crypto.CryptoEncoding.BASE64 }
+      );
+      return hash;
+    } catch (error) {
+      console.warn('Encryption failed:', error);
+      return data;
+    }
+  }
+
+  getEncryptionKey(): string | null {
+    return this.encryptionKey;
   }
 
   private async createTables(): Promise<void> {
@@ -156,12 +200,32 @@ export class Database {
       CREATE TABLE IF NOT EXISTS person_scores (
         id TEXT PRIMARY KEY,
         personId TEXT NOT NULL,
-        score INTEGER NOT NULL,
-        lastInteractionDate TEXT,
-        interactionCount INTEGER DEFAULT 0,
-        createdAt TEXT NOT NULL,
-        updatedAt TEXT NOT NULL,
+        relationshipScore INTEGER NOT NULL,
+        interactionFrequency INTEGER NOT NULL,
+        lastInteractionDaysAgo INTEGER NOT NULL,
+        totalInteractions INTEGER NOT NULL,
+        averageResponseTime REAL,
+        calculatedAt TEXT NOT NULL,
         FOREIGN KEY (personId) REFERENCES persons(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS annotations (
+        id TEXT PRIMARY KEY,
+        entityType TEXT NOT NULL,
+        entityId TEXT NOT NULL,
+        type TEXT NOT NULL,
+        content TEXT NOT NULL,
+        metadata TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS meeting_places (
+        meetingId TEXT NOT NULL,
+        placeId TEXT NOT NULL,
+        PRIMARY KEY (meetingId, placeId),
+        FOREIGN KEY (meetingId) REFERENCES meetings(id),
+        FOREIGN KEY (placeId) REFERENCES places(id)
       );
 
       CREATE INDEX IF NOT EXISTS idx_persons_company ON persons(companyId);
@@ -170,7 +234,9 @@ export class Database {
       CREATE INDEX IF NOT EXISTS idx_tasks_person ON tasks(personId);
       CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(dueDate);
       CREATE INDEX IF NOT EXISTS idx_person_scores_person ON person_scores(personId);
-      CREATE INDEX IF NOT EXISTS idx_person_scores_score ON person_scores(score);
+      CREATE INDEX IF NOT EXISTS idx_person_scores_score ON person_scores(relationshipScore);
+      CREATE INDEX IF NOT EXISTS idx_annotations_entity ON annotations(entityType, entityId);
+      CREATE INDEX IF NOT EXISTS idx_annotations_type ON annotations(type);
     `);
   }
 
@@ -214,12 +280,12 @@ export class Database {
       ('t2', 'Send Mike project files', 'Share the design files', '${new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString()}', 0, null, 'follow-up', 'p2', '${now}', '${now}'),
       ('t3', 'Coffee with Emily', 'Catch up at Central Coffee', '${new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()}', 0, null, 'reminder', 'p3', '${now}', '${now}');
 
-      INSERT INTO person_scores (id, personId, score, lastInteractionDate, interactionCount, createdAt, updatedAt) VALUES
-      ('ps1', 'p1', 95, '${new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()}', 15, '${now}', '${now}'),
-      ('ps2', 'p2', 80, '${new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()}', 10, '${now}', '${now}'),
-      ('ps3', 'p3', 75, '${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()}', 8, '${now}', '${now}'),
-      ('ps4', 'p4', 70, '${new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()}', 5, '${now}', '${now}'),
-      ('ps5', 'p5', 65, '${new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()}', 6, '${now}', '${now}');
+      INSERT INTO person_scores (id, personId, relationshipScore, interactionFrequency, lastInteractionDaysAgo, totalInteractions, averageResponseTime, calculatedAt) VALUES
+      ('ps1', 'p1', 95, 5, 2, 15, 2.5, '${now}'),
+      ('ps2', 'p2', 80, 3, 5, 10, 4.0, '${now}'),
+      ('ps3', 'p3', 75, 2, 7, 8, 6.0, '${now}'),
+      ('ps4', 'p4', 70, 4, 1, 5, 1.5, '${now}'),
+      ('ps5', 'p5', 65, 1, 10, 6, 8.0, '${now}');
 
       INSERT INTO meetings (id, title, date, location, notes, createdAt, updatedAt) VALUES
       ('m1', 'Team Sync', '${new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString()}', 'Office', 'Weekly sync meeting', '${now}', '${now}'),

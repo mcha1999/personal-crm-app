@@ -4,12 +4,14 @@ import { Platform } from 'react-native';
 
 export abstract class BaseDAO<T> {
   protected db: SQLite.SQLiteDatabase | null;
+  protected database: Database;
   protected tableName: string;
   protected isWebPlatform = Platform.OS === 'web';
 
   constructor(tableName: string) {
     this.tableName = tableName;
-    this.db = Database.getInstance().getDb();
+    this.database = Database.getInstance();
+    this.db = this.database.getDb();
   }
 
   protected generateId(): string {
@@ -18,6 +20,23 @@ export abstract class BaseDAO<T> {
 
   protected getNow(): string {
     return new Date().toISOString();
+  }
+
+  protected async encryptSensitiveData(data: string): Promise<string> {
+    return await this.database.encryptData(data);
+  }
+
+  protected parseJsonField<T>(field: string | null): T | null {
+    if (!field) return null;
+    try {
+      return JSON.parse(field) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  protected stringifyJsonField(data: any): string {
+    return JSON.stringify(data || null);
   }
 
   async findAll(): Promise<T[]> {
