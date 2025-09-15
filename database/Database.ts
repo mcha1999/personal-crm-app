@@ -8,7 +8,7 @@ export class Database {
   private db: SQLite.SQLiteDatabase | null = null;
   private isWebPlatform = Platform.OS === 'web';
   private encryptionKey: string | null = null;
-  private readonly CURRENT_VERSION = 2;
+  private readonly CURRENT_VERSION = 3;
 
   private constructor() {}
 
@@ -145,6 +145,47 @@ export class Database {
         }
       } catch (error) {
         console.error('Migration 1 -> 2 failed:', error);
+        // Don't throw - let the app continue with potential issues
+      }
+    }
+
+    if (currentVersion < 3) {
+      console.log('Running migration 2 -> 3: Recreating person_scores table');
+      try {
+        // Drop and recreate the person_scores table to ensure correct schema
+        await this.db.execAsync(`
+          DROP TABLE IF EXISTS person_scores;
+          
+          CREATE TABLE person_scores (
+            id TEXT PRIMARY KEY,
+            personId TEXT NOT NULL,
+            relationshipScore INTEGER NOT NULL,
+            interactionFrequency INTEGER NOT NULL,
+            lastInteractionDaysAgo INTEGER NOT NULL,
+            totalInteractions INTEGER NOT NULL,
+            averageResponseTime REAL,
+            calculatedAt TEXT NOT NULL,
+            FOREIGN KEY (personId) REFERENCES persons(id)
+          );
+          
+          CREATE INDEX IF NOT EXISTS idx_person_scores_person ON person_scores(personId);
+          CREATE INDEX IF NOT EXISTS idx_person_scores_score ON person_scores(relationshipScore);
+        `);
+        
+        // Re-seed initial scores
+        const now = new Date().toISOString();
+        await this.db.execAsync(`
+          INSERT INTO person_scores (id, personId, relationshipScore, interactionFrequency, lastInteractionDaysAgo, totalInteractions, averageResponseTime, calculatedAt) VALUES
+          ('ps1', 'p1', 95, 5, 2, 15, 2.5, '${now}'),
+          ('ps2', 'p2', 80, 3, 5, 10, 4.0, '${now}'),
+          ('ps3', 'p3', 75, 2, 7, 8, 6.0, '${now}'),
+          ('ps4', 'p4', 70, 4, 1, 5, 1.5, '${now}'),
+          ('ps5', 'p5', 65, 1, 10, 6, 8.0, '${now}');
+        `);
+        
+        console.log('Successfully recreated person_scores table');
+      } catch (error) {
+        console.error('Migration 2 -> 3 failed:', error);
         // Don't throw - let the app continue with potential issues
       }
     }
