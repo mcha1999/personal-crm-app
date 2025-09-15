@@ -288,12 +288,19 @@ export const SettingsScreen: React.FC = () => {
           style: 'default',
           onPress: async () => {
             try {
+              console.log('[Settings] Starting onboarding reset...');
               await resetOnboarding();
-              // The onboarding flow will appear immediately due to state change
-              console.log('[Settings] Onboarding reset successfully - flow will appear immediately');
+              console.log('[Settings] Onboarding reset completed - flow should appear immediately');
+              
+              // Show success message
+              Alert.alert(
+                'Reset Complete',
+                'Onboarding has been reset. The welcome flow will appear now.',
+                [{ text: 'OK' }]
+              );
             } catch (error) {
-              console.error('Reset onboarding error:', error);
-              Alert.alert('Reset Failed', 'Could not reset onboarding');
+              console.error('[Settings] Reset onboarding error:', error);
+              Alert.alert('Reset Failed', 'Could not reset onboarding. Please try again.');
             }
           }
         }

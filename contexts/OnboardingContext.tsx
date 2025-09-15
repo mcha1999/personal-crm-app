@@ -295,14 +295,14 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
     try {
       console.log('[Onboarding] Resetting onboarding...');
       
+      // Clear AsyncStorage first
       await AsyncStorage.removeItem(ONBOARDING_COMPLETED_KEY);
       await AsyncStorage.removeItem(SYNC_PREFERENCES_KEY);
       
-      // Reset all state immediately
-      setIsOnboardingCompleted(false);
-      setSyncPreferences(defaultSyncPreferences);
-      setCurrentStep(0);
-      setSteps([
+      console.log('[Onboarding] AsyncStorage cleared');
+      
+      // Reset all state immediately and force re-render
+      const initialSteps = [
         {
           id: 'privacy',
           title: 'Privacy First',
@@ -338,9 +338,15 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
           completed: false,
           inProgress: false,
         },
-      ]);
+      ];
       
-      console.log('[Onboarding] Onboarding reset successfully');
+      // Update state in the correct order
+      setSteps(initialSteps);
+      setCurrentStep(0);
+      setSyncPreferences(defaultSyncPreferences);
+      setIsOnboardingCompleted(false);
+      
+      console.log('[Onboarding] State reset - onboarding should now appear');
     } catch (error) {
       console.error('[Onboarding] Error resetting onboarding:', error);
       throw error;
