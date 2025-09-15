@@ -3,7 +3,9 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } f
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield } from 'lucide-react-native';
 import { BackgroundTaskManager } from '../services/BackgroundTaskManager';
+import { GoogleAPIService } from '../services/GoogleAPIService';
 import { LocalExport } from '../database/LocalExport';
+import { PRIVACY_CONFIG, PRIVACY_SCOPES, PRIVACY_GUARANTEES } from '../constants/privacy';
 
 type SettingItem = 
   | { type: 'switch'; icon: React.ReactElement; label: string; value: boolean; onValueChange: (value: boolean) => void; subtitle?: string }
@@ -19,6 +21,8 @@ export const SettingsScreen: React.FC = () => {
   const [notifications, setNotifications] = React.useState(true);
   const [reminders, setReminders] = React.useState(true);
   const [faceIdEnabled, setFaceIdEnabled] = React.useState(false);
+  const [googleAPIEnabled, setGoogleAPIEnabled] = React.useState(false);
+  const [isGoogleAuthenticated, setIsGoogleAuthenticated] = React.useState(false);
   const [nextSyncTime, setNextSyncTime] = React.useState<Date | null>(null);
   const [nextScoreTime, setNextScoreTime] = React.useState<Date | null>(null);
 
@@ -26,6 +30,16 @@ export const SettingsScreen: React.FC = () => {
     const taskManager = BackgroundTaskManager.getInstance();
     setNextSyncTime(taskManager.getNextGmailSyncTime());
     setNextScoreTime(taskManager.getNextIndexScoreTime());
+
+    // Check Google API authentication status
+    const checkGoogleAuth = async () => {
+      const googleAPI = GoogleAPIService.getInstance();
+      const authenticated = await googleAPI.isAuthenticated();
+      setIsGoogleAuthenticated(authenticated);
+      setGoogleAPIEnabled(authenticated);
+    };
+    
+    checkGoogleAuth();
 
     const interval = setInterval(() => {
       setNextSyncTime(taskManager.getNextGmailSyncTime());
@@ -52,11 +66,50 @@ export const SettingsScreen: React.FC = () => {
     return `in ${minutes}m`;
   };
 
+  const handleGoogleAPIToggle = async (enabled: boolean) => {
+    if (enabled) {
+      // Enable Google API - authenticate
+      const googleAPI = GoogleAPIService.getInstance();
+      const success = await googleAPI.authenticate();
+      if (success) {
+        setGoogleAPIEnabled(true);
+        setIsGoogleAuthenticated(true);
+        Alert.alert('Google API Enabled', 'You can now sync with Gmail, Contacts, and Calendar. All processing happens locally on your device.');
+      } else {
+        Alert.alert('Authentication Failed', 'Could not authenticate with Google.');
+      }
+    } else {
+      // Disable Google API - sign out
+      Alert.alert(
+        'Disable Google API',
+        'This will remove Google authentication and disable sync features. Your local data will remain intact.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Disable',
+            style: 'destructive',
+            onPress: async () => {
+              const googleAPI = GoogleAPIService.getInstance();
+              await googleAPI.signOut();
+              setGoogleAPIEnabled(false);
+              setIsGoogleAuthenticated(false);
+            }
+          }
+        ]
+      );
+    }
+  };
+
   const handleManualSync = async () => {
+    if (!googleAPIEnabled) {
+      Alert.alert('Google API Disabled', 'Please enable Google API integration first.');
+      return;
+    }
+    
     try {
       const taskManager = BackgroundTaskManager.getInstance();
       await taskManager.runGmailDeltaSync();
-      Alert.alert('Success', 'Gmail sync completed');
+      Alert.alert('Success', 'Gmail sync completed (all processing local)');
       setNextSyncTime(taskManager.getNextGmailSyncTime());
     } catch (error) {
       Alert.alert('Error', 'Failed to sync Gmail');
@@ -78,27 +131,81 @@ export const SettingsScreen: React.FC = () => {
     try {
       const exporter = new LocalExport();
       await exporter.exportData();
-      Alert.alert('Export Complete', 'Database exported successfully');
+      Alert.alert('Export Complete', 'Database exported successfully to your device');
     } catch (error) {
       Alert.alert('Export Failed', 'Could not export database');
     }
   };
 
+  const showPrivacyInfo = () => {
+    Alert.alert(
+      'Privacy Information',
+      `Device-Only Architecture:\n\n• ${PRIVACY_GUARANTEES.slice(0, 5).join('\n• ')}\n\nAll your personal data stays on your device and is never transmitted to external servers.`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const showGoogleScopeInfo = () => {
+    const scopeInfo = Object.entries(PRIVACY_SCOPES)
+      .map(([key, scope]) => `${key.toUpperCase()}:\n${scope.purpose}\nProcessing: ${scope.processing}`)
+      .join('\n\n');
+    
+    Alert.alert(
+      'Google API Scopes',
+      `Required permissions (read-only):\n\n${scopeInfo}\n\nAll data processing happens locally on your device.`,
+      [{ text: 'OK' }]
+    );
+  };
+
   const settingsSections: SettingSection[] = [
     {
-      title: 'Background Tasks',
+      title: 'Privacy & Data',
       items: [
         {
-          icon: <RefreshCw size={20} color="#007AFF" />,
-          label: 'Gmail Delta Sync',
-          subtitle: `Next run: ${formatNextRunTime(nextSyncTime)}`,
+          icon: <Shield size={20} color="#27AE60" />,
+          label: 'Privacy Information',
+          subtitle: 'Device-only architecture - no data transmission',
+          type: 'action',
+          onPress: showPrivacyInfo,
+        },
+        {
+          icon: <Download size={20} color="#27AE60" />,
+          label: 'Export Database',
+          subtitle: 'Export all data to local files',
+          type: 'action',
+          onPress: handleExport,
+        },
+      ],
+    },
+    {
+      title: 'Google API Integration (Optional)',
+      items: [
+        {
+          icon: <RefreshCw size={20} color={googleAPIEnabled ? "#007AFF" : "#95A5A6"} />,
+          label: 'Enable Google Sync',
+          subtitle: googleAPIEnabled ? 'Enabled (device-only processing)' : 'Disabled',
+          type: 'switch',
+          value: googleAPIEnabled,
+          onValueChange: handleGoogleAPIToggle,
+        },
+        {
+          icon: <Info size={20} color={googleAPIEnabled ? "#3498DB" : "#95A5A6"} />,
+          label: 'API Scopes & Permissions',
+          subtitle: googleAPIEnabled ? 'View required permissions' : 'Enable Google API first',
+          type: 'action',
+          onPress: googleAPIEnabled ? showGoogleScopeInfo : () => {},
+        },
+        {
+          icon: <RefreshCw size={20} color={googleAPIEnabled ? "#007AFF" : "#95A5A6"} />,
+          label: 'Gmail Sync',
+          subtitle: googleAPIEnabled ? `Next run: ${formatNextRunTime(nextSyncTime)}` : 'Requires Google API',
           type: 'action',
           onPress: handleManualSync,
         },
         {
           icon: <Brain size={20} color="#9B59B6" />,
           label: 'Index & Score',
-          subtitle: `Next run: ${formatNextRunTime(nextScoreTime)}`,
+          subtitle: `Next run: ${formatNextRunTime(nextScoreTime)} (local processing)`,
           type: 'action',
           onPress: handleManualScore,
         },
@@ -129,36 +236,14 @@ export const SettingsScreen: React.FC = () => {
       ],
     },
     {
-      title: 'Privacy & Security',
+      title: 'Security',
       items: [
-        {
-          icon: <Shield size={20} color="#27AE60" />,
-          label: 'Privacy: On-device only',
-          subtitle: 'All data stays on your device',
-          type: 'navigation',
-        },
         {
           icon: <Lock size={20} color="#E74C3C" />,
           label: 'Face ID App Lock',
           type: 'switch',
           value: faceIdEnabled,
           onValueChange: setFaceIdEnabled,
-        },
-        {
-          icon: <Lock size={20} color="#95A5A6" />,
-          label: 'Privacy Settings',
-          type: 'navigation',
-        },
-      ],
-    },
-    {
-      title: 'Data',
-      items: [
-        {
-          icon: <Download size={20} color="#27AE60" />,
-          label: 'Export Database',
-          type: 'action',
-          onPress: handleExport,
         },
       ],
     },
@@ -254,7 +339,8 @@ export const SettingsScreen: React.FC = () => {
         </TouchableOpacity>
 
         <View style={styles.footer}>
-          <Text style={styles.version}>Kin v1.0.0</Text>
+          <Text style={styles.version}>Kin v1.0.0 - Privacy-First CRM</Text>
+          <Text style={styles.copyright}>Device-only architecture • No data transmission</Text>
           <Text style={styles.copyright}>Made with ❤️ for meaningful connections</Text>
         </View>
       </ScrollView>
