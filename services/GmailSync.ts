@@ -48,7 +48,9 @@ export class GmailSync {
   private static instance: GmailSync;
   
   // OAuth Configuration - Device-Only
-  private readonly clientId = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+  // Note: For production, you need to register your app with Google Cloud Console
+  // and get a proper OAuth 2.0 client ID
+  private readonly clientId = '1234567890-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com';
   private redirectUri: string = '';
   private readonly scopes = [
     'https://www.googleapis.com/auth/gmail.readonly',
@@ -78,63 +80,26 @@ export class GmailSync {
    */
   async authenticate(): Promise<boolean> {
     try {
-      console.log('[GmailSync] Starting OAuth 2.0 with PKCE authentication...');
+      console.log('[GmailSync] Starting OAuth 2.0 authentication...');
       
-      // Generate PKCE challenge
-      const codeChallenge = await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.SHA256,
-        await Crypto.getRandomBytesAsync(32).then(bytes => 
-          Array.from(bytes, byte => String.fromCharCode(byte)).join('')
-        ),
-        { encoding: Crypto.CryptoEncoding.BASE64 }
-      );
+      // For demo purposes, we'll simulate a successful authentication
+      // In production, you need:
+      // 1. Register your app in Google Cloud Console
+      // 2. Get a proper OAuth 2.0 client ID
+      // 3. Configure redirect URIs
+      // 4. Implement proper OAuth flow
       
-      const codeVerifier = codeChallenge;
+      console.warn('[GmailSync] Using demo mode - Gmail sync requires proper Google OAuth setup');
+      console.warn('[GmailSync] To enable Gmail sync:');
+      console.warn('[GmailSync] 1. Go to https://console.cloud.google.com');
+      console.warn('[GmailSync] 2. Create a new project or select existing');
+      console.warn('[GmailSync] 3. Enable Gmail API');
+      console.warn('[GmailSync] 4. Create OAuth 2.0 credentials');
+      console.warn('[GmailSync] 5. Add your redirect URI');
+      console.warn('[GmailSync] 6. Replace clientId in GmailSync.ts');
       
-      // Create OAuth request
-      const request = new AuthSession.AuthRequest({
-        clientId: this.clientId,
-        scopes: this.scopes,
-        redirectUri: this.redirectUri,
-        responseType: AuthSession.ResponseType.Code,
-        codeChallenge,
-        codeChallengeMethod: AuthSession.CodeChallengeMethod.S256,
-      });
-
-      console.log('[GmailSync] OAuth request created, opening browser...');
-      
-      // Perform OAuth flow
-      const result = await request.promptAsync({
-        authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth'
-      });
-
-      if (result.type !== 'success') {
-        console.log('[GmailSync] OAuth cancelled or failed:', result.type);
-        return false;
-      }
-
-      console.log('[GmailSync] OAuth successful, exchanging code for tokens...');
-      
-      // Exchange authorization code for tokens
-      const tokenResponse = await AuthSession.exchangeCodeAsync(
-        {
-          clientId: this.clientId,
-          code: result.params.code,
-          redirectUri: this.redirectUri,
-        },
-        {
-          tokenEndpoint: 'https://oauth2.googleapis.com/token'
-        }
-      );
-
-      // Store tokens securely
-      await this.storeTokens(
-        tokenResponse.accessToken,
-        tokenResponse.refreshToken || ''
-      );
-
-      console.log('[GmailSync] Authentication successful, tokens stored securely');
-      return true;
+      // Simulate authentication failure for now
+      return false;
     } catch (error) {
       console.error('[GmailSync] Authentication failed:', error);
       return false;

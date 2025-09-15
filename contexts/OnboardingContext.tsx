@@ -137,8 +137,8 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
       
       if (Platform.OS === 'web') {
         console.log('[Onboarding] Contacts not available on web');
+        setStepError('contacts', 'Contacts access is not available on web. Please use the mobile app.');
         setSyncPreferences(prev => ({ ...prev, contactsEnabled: false }));
-        completeStep('contacts');
         return false;
       }
 
@@ -151,6 +151,15 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
       
       if (granted) {
         completeStep('contacts', false);
+        // Try to get contacts count for feedback
+        try {
+          const { data } = await Contacts.getContactsAsync({ pageSize: 1 });
+          console.log('[Onboarding] Contacts access verified, can access contacts');
+        } catch (err) {
+          console.log('[Onboarding] Contacts permission granted but unable to access contacts');
+        }
+      } else if (status === 'denied') {
+        setStepError('contacts', 'Permission denied. You can enable this later in Settings.');
       } else {
         // Mark as completed but skipped
         completeStep('contacts', true);
@@ -159,7 +168,7 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
       return granted;
     } catch (error) {
       console.error('[Onboarding] Error requesting contacts permission:', error);
-      setStepError('contacts', 'Failed to request contacts permission');
+      setStepError('contacts', 'Failed to request contacts permission. Please try again.');
       return false;
     }
   }, [completeStep, setStepInProgress, setStepError]);
@@ -171,7 +180,7 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
       
       if (Platform.OS === 'web' && source === 'eventkit') {
         console.log('[Onboarding] EventKit not available on web');
-        setStepError('calendar', 'EventKit is not available on web. Please choose Google Calendar.');
+        setStepError('calendar', 'Device calendar is not available on web. Please choose Google Calendar.');
         return false;
       }
 
@@ -189,6 +198,15 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
         
         if (granted) {
           completeStep('calendar', false);
+          // Try to get calendars for verification
+          try {
+            const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+            console.log(`[Onboarding] Calendar access verified, found ${calendars.length} calendars`);
+          } catch (err) {
+            console.log('[Onboarding] Calendar permission granted but unable to access calendars');
+          }
+        } else if (status === 'denied') {
+          setStepError('calendar', 'Permission denied. You can enable this later in Settings.');
         } else {
           // Mark as completed but skipped
           completeStep('calendar', true);
@@ -196,18 +214,20 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
         
         return granted;
       } else {
-        // Google Calendar will be handled via OAuth in Gmail step
+        // Google Calendar OAuth flow would go here
+        // For now, we'll mark it as pending proper OAuth implementation
+        console.warn('[Onboarding] Google Calendar requires OAuth implementation');
         setSyncPreferences(prev => ({ 
           ...prev, 
-          calendarEnabled: true,
+          calendarEnabled: false,
           calendarSource: 'google'
         }));
-        completeStep('calendar', false);
-        return true;
+        setStepError('calendar', 'Google Calendar integration requires additional setup. You can configure this later in Settings.');
+        return false;
       }
     } catch (error) {
       console.error('[Onboarding] Error requesting calendar permission:', error);
-      setStepError('calendar', 'Failed to request calendar permission');
+      setStepError('calendar', 'Failed to request calendar permission. Please try again.');
       return false;
     }
   }, [completeStep, setStepInProgress, setStepError]);
@@ -229,8 +249,12 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
         completeStep('gmail', false);
         return true;
       } else {
+        // Gmail sync requires proper OAuth setup
+        setStepError('gmail', 'Gmail integration requires Google OAuth setup. This feature will be available once configured.');
         // Mark as completed but skipped
-        completeStep('gmail', true);
+        setTimeout(() => {
+          completeStep('gmail', true);
+        }, 2000);
         return false;
       }
     } catch (error) {
