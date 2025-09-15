@@ -11,6 +11,7 @@ import { PRIVACY_CONFIG, PRIVACY_SCOPES, PRIVACY_GUARANTEES } from '../constants
 import { useAuth } from '@/contexts/AuthContext';
 import { useContacts } from '@/contexts/ContactsContext';
 import { useDatabase } from '@/contexts/DatabaseContext';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { CalendarListener } from '../services/CalendarListener';
 import { PersonDAO } from '../database/PersonDAO';
 import { MeetingDAO } from '../database/MeetingDAO';
@@ -47,6 +48,15 @@ export const SettingsScreen: React.FC = () => {
   const { isAuthEnabled, enableAuth, disableAuth, getSupportedAuthTypes } = useAuth();
   const { isImporting, lastImportResult, lastImportDate, error: contactsError, importContacts, clearError } = useContacts();
   const { database, isInitialized } = useDatabase();
+  const { requestContactsPermission, requestCalendarPermission, connectGmail, steps } = useOnboarding();
+  
+  // Check permission states from onboarding
+  const contactsStep = steps.find(s => s.id === 'contacts');
+  const calendarStep = steps.find(s => s.id === 'calendar');
+  const gmailStep = steps.find(s => s.id === 'gmail');
+  const isContactsEnabled = contactsStep?.completed && !contactsStep?.error;
+  const isCalendarEnabled = calendarStep?.completed && !calendarStep?.error;
+  const isGmailEnabled = gmailStep?.completed && !gmailStep?.error;
 
   useEffect(() => {
     const loadTaskStatus = async () => {
@@ -300,6 +310,33 @@ export const SettingsScreen: React.FC = () => {
       Alert.alert('Import Failed', message);
     }
   };
+  
+  const handleEnableContacts = async () => {
+    try {
+      await requestContactsPermission();
+      Alert.alert('Success', 'Contacts permission granted');
+    } catch (error) {
+      Alert.alert('Permission Denied', 'Could not enable contacts access');
+    }
+  };
+  
+  const handleEnableCalendar = async () => {
+    try {
+      await requestCalendarPermission('eventkit');
+      Alert.alert('Success', 'Calendar permission granted');
+    } catch (error) {
+      Alert.alert('Permission Denied', 'Could not enable calendar access');
+    }
+  };
+  
+  const handleLinkGmail = async () => {
+    try {
+      await connectGmail();
+      Alert.alert('Success', 'Gmail connected successfully');
+    } catch (error) {
+      Alert.alert('Connection Failed', 'Could not connect to Gmail');
+    }
+  };
 
   const handleImportCalendar = async () => {
     if (isCalendarImporting || !isInitialized) return;
@@ -492,6 +529,32 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const settingsSections: SettingSection[] = [
+    {
+      title: 'Data Sources',
+      items: [
+        ...(!isContactsEnabled ? [{
+          icon: <Users size={20} color="#FF9500" />,
+          label: 'Enable Contacts',
+          subtitle: 'Grant permission to access contacts',
+          type: 'action' as const,
+          onPress: handleEnableContacts,
+        }] : []),
+        ...(!isCalendarEnabled ? [{
+          icon: <CalendarIcon size={20} color="#FF9500" />,
+          label: 'Enable Calendar',
+          subtitle: 'Grant permission to access calendar',
+          type: 'action' as const,
+          onPress: handleEnableCalendar,
+        }] : []),
+        ...(!isGmailEnabled ? [{
+          icon: <Mail size={20} color="#FF9500" />,
+          label: 'Link Gmail',
+          subtitle: 'Connect your Gmail account',
+          type: 'action' as const,
+          onPress: handleLinkGmail,
+        }] : []),
+      ],
+    },
     {
       title: 'Privacy & Data',
       items: [

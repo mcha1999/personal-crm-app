@@ -22,6 +22,7 @@ import { Message } from '@/models/Message';
 import { Meeting } from '@/models/Meeting';
 import { Interaction } from '@/models/Interaction';
 import { GradientHeader } from '@/components/GradientHeader';
+import { DataSourceBanner } from '@/components/DataSourceBanner';
 import { theme } from '@/constants/theme';
 import { ScoreJob } from '@/jobs/ScoreJob';
 import { BackgroundTaskManager } from '@/services/BackgroundTaskManager';
@@ -294,7 +295,8 @@ export const TodayScreen: React.FC = () => {
           />
         }
       >
-
+        <DataSourceBanner />
+        
         <Animated.View style={styles.animatedContainer}>
           {upcomingMeetings.length > 0 && (
             <View style={styles.section}>
