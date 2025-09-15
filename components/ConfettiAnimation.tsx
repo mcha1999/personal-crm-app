@@ -28,18 +28,18 @@ export const ConfettiAnimation: React.FC<ConfettiAnimationProps> = ({
       onComplete();
     }
   }, [onComplete]);
-  
-  const colors = [
-    theme.colors.primary,
-    theme.colors.secondary,
-    theme.colors.accent,
-    '#FFD700',
-    '#FF6B6B',
-    '#4ECDC4',
-  ];
 
   useEffect(() => {
     if (isVisible) {
+      const colors = [
+        theme.colors.primary,
+        theme.colors.secondary,
+        theme.colors.accent,
+        '#FFD700',
+        '#FF6B6B',
+        '#4ECDC4',
+      ];
+      
       // Create confetti pieces
       const pieces: ConfettiPiece[] = [];
       for (let i = 0; i < 30; i++) {
@@ -63,7 +63,7 @@ export const ConfettiAnimation: React.FC<ConfettiAnimationProps> = ({
             useNativeDriver: true,
           }),
           Animated.timing(piece.x, {
-            toValue: (piece.x as any).__getValue() + (Math.random() - 0.5) * 200,
+            toValue: (piece.x as any)._value + (Math.random() - 0.5) * 200,
             duration: 2500,
             useNativeDriver: true,
           }),

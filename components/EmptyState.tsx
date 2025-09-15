@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { theme } from '@/constants/theme';
 
@@ -100,12 +100,18 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         },
       ]}
     >
-      <LottieView
-        source={animationSource || defaultAnimation}
-        autoPlay
-        loop
-        style={styles.animation}
-      />
+      {Platform.OS !== 'web' ? (
+        <LottieView
+          source={animationSource || defaultAnimation}
+          autoPlay
+          loop
+          style={styles.animation}
+        />
+      ) : (
+        <View style={styles.placeholderAnimation}>
+          <View style={styles.placeholderCircle} />
+        </View>
+      )}
       <Text style={styles.title}>{title}</Text>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
     </Animated.View>
@@ -123,6 +129,21 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     marginBottom: theme.spacing.lg,
+  },
+  placeholderAnimation: {
+    width: 200,
+    height: 200,
+    marginBottom: theme.spacing.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: theme.colors.primary,
+    opacity: 0.3,
   },
   title: {
     ...theme.typography.title2,
