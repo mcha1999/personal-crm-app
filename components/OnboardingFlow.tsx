@@ -121,15 +121,6 @@ export function OnboardingFlow() {
             )}
           </TouchableOpacity>
         )}
-        
-        {!canContinue && !currentStepData?.inProgress && (
-          <TouchableOpacity
-            style={styles.skipButton}
-            onPress={handleNext}
-          >
-            <Text style={styles.skipButtonText}>Skip this step</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </SafeAreaView>
   );
