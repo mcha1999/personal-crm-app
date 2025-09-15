@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import LottieView from 'lottie-react-native';
+import Lottie from 'lottie-react-native';
 import { theme } from '@/constants/theme';
 
 interface EmptyStateProps {
@@ -100,7 +100,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         },
       ]}
     >
-      <LottieView
+      <Lottie
         source={animationSource || defaultAnimation}
         autoPlay
         loop
