@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import JSZip from 'jszip';
 import { Database } from './Database';
 import { PersonDAO } from './PersonDAO';
@@ -35,21 +36,21 @@ export class LocalExport {
   }
 
   /**
-   * Export Data - Device-Only Processing
+   * Export Data to Files App - Device-Only Processing
    * 
    * Privacy Implementation:
    * - Exports all CRM data to local device storage
    * - No external transmission or cloud upload
-   * - Creates ZIP archive for easy sharing/backup
+   * - Creates ZIP archive and saves to Files app
    * - User controls where exported data goes
    */
-  async exportData(): Promise<void> {
+  async exportToFiles(): Promise<void> {
     if (Platform.OS === 'web') {
-      throw new Error('Export is not available on web platform');
+      throw new Error('Export to Files is not available on web platform');
     }
     
     try {
-      console.log('[LocalExport] Starting data export (device-only)...');
+      console.log('[LocalExport] Starting data export to Files app (device-only)...');
       
       const zip = new JSZip();
       
@@ -100,22 +101,30 @@ export class LocalExport {
       
       console.log('[LocalExport] Export file created locally:', fileUri);
       
-      // Share the file (user controls destination)
+      // Share to Files app (iOS) or system share (Android)
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri, {
           mimeType: 'application/zip',
-          dialogTitle: 'Export Kin Data (Privacy-First)',
+          dialogTitle: 'Save Kin Export to Files',
+          UTI: 'public.zip-archive',
         });
       } else {
         console.log('[LocalExport] Sharing is not available on this platform');
         throw new Error('Sharing is not available on this platform');
       }
       
-      console.log('[LocalExport] Export completed successfully (all processing local)');
+      console.log('[LocalExport] Export to Files completed successfully (all processing local)');
     } catch (error) {
-      console.error('[LocalExport] Export failed:', error);
+      console.error('[LocalExport] Export to Files failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Legacy Export Method - Kept for compatibility
+   */
+  async exportData(): Promise<void> {
+    return this.exportToFiles();
   }
 
   /**
@@ -171,6 +180,44 @@ export class LocalExport {
         updatedAt: p.updatedAt.toISOString(),
       })),
     };
+  }
+
+  /**
+   * Import Data from Files App - Device-Only Processing
+   * 
+   * Privacy Implementation:
+   * - Imports data from Files app to local database
+   * - No external transmission during import process
+   * - Validates data integrity before import
+   * - Maintains device-only architecture
+   */
+  async importFromFiles(): Promise<void> {
+    if (Platform.OS === 'web') {
+      throw new Error('Import from Files is not available on web platform');
+    }
+    
+    try {
+      console.log('[LocalExport] Starting file picker for import...');
+      
+      // Open document picker to select ZIP file from Files app
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/zip',
+        copyToCacheDirectory: true,
+      });
+      
+      if (result.canceled) {
+        console.log('[LocalExport] Import cancelled by user');
+        return;
+      }
+      
+      const fileUri = result.assets[0].uri;
+      console.log('[LocalExport] Selected file for import:', fileUri);
+      
+      await this.importData(fileUri);
+    } catch (error) {
+      console.error('[LocalExport] Import from Files failed:', error);
+      throw error;
+    }
   }
 
   /**

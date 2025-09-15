@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield } from 'lucide-react-native';
+import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield, Upload, FileText } from 'lucide-react-native';
 import { BackgroundTaskManager } from '../services/BackgroundTaskManager';
 import { GoogleAPIService } from '../services/GoogleAPIService';
 import { LocalExport } from '../database/LocalExport';
 import { PRIVACY_CONFIG, PRIVACY_SCOPES, PRIVACY_GUARANTEES } from '../constants/privacy';
+import { useAuth } from '@/contexts/AuthContext';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 type SettingItem = 
   | { type: 'switch'; icon: React.ReactElement; label: string; value: boolean; onValueChange: (value: boolean) => void; subtitle?: string }
@@ -20,11 +22,13 @@ type SettingSection = {
 export const SettingsScreen: React.FC = () => {
   const [notifications, setNotifications] = React.useState(true);
   const [reminders, setReminders] = React.useState(true);
-  const [faceIdEnabled, setFaceIdEnabled] = React.useState(false);
   const [googleAPIEnabled, setGoogleAPIEnabled] = React.useState(false);
   const [isGoogleAuthenticated, setIsGoogleAuthenticated] = React.useState(false);
   const [nextSyncTime, setNextSyncTime] = React.useState<Date | null>(null);
   const [nextScoreTime, setNextScoreTime] = React.useState<Date | null>(null);
+  const [supportedAuthTypes, setSupportedAuthTypes] = React.useState<LocalAuthentication.AuthenticationType[]>([]);
+  
+  const { isAuthEnabled, enableAuth, disableAuth, getSupportedAuthTypes } = useAuth();
 
   useEffect(() => {
     const taskManager = BackgroundTaskManager.getInstance();
@@ -39,7 +43,14 @@ export const SettingsScreen: React.FC = () => {
       setGoogleAPIEnabled(authenticated);
     };
     
+    // Check supported authentication types
+    const checkAuthTypes = async () => {
+      const types = await getSupportedAuthTypes();
+      setSupportedAuthTypes(types);
+    };
+    
     checkGoogleAuth();
+    checkAuthTypes();
 
     const interval = setInterval(() => {
       setNextSyncTime(taskManager.getNextGmailSyncTime());
@@ -47,7 +58,7 @@ export const SettingsScreen: React.FC = () => {
     }, 60000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [getSupportedAuthTypes]);
 
   const formatNextRunTime = (date: Date | null): string => {
     if (!date) return 'Not scheduled';
@@ -128,13 +139,87 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const handleExport = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Not Available', 'Export is not available on web platform');
+      return;
+    }
+    
     try {
       const exporter = new LocalExport();
-      await exporter.exportData();
-      Alert.alert('Export Complete', 'Database exported successfully to your device');
+      await exporter.exportToFiles();
+      Alert.alert('Export Complete', 'Database exported successfully to Files app');
     } catch (error) {
+      console.error('Export error:', error);
       Alert.alert('Export Failed', 'Could not export database');
     }
+  };
+
+  const handleImport = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Not Available', 'Import is not available on web platform');
+      return;
+    }
+    
+    Alert.alert(
+      'Import Data',
+      'This will import data from a Kin export file. Existing data will be preserved.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Import',
+          onPress: async () => {
+            try {
+              const exporter = new LocalExport();
+              await exporter.importFromFiles();
+              Alert.alert('Import Complete', 'Data imported successfully');
+            } catch (error) {
+              console.error('Import error:', error);
+              Alert.alert('Import Failed', 'Could not import data');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleAuthToggle = async (enabled: boolean) => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Not Available', 'Biometric authentication is not available on web');
+      return;
+    }
+    
+    try {
+      if (enabled) {
+        await enableAuth();
+        Alert.alert('App Lock Enabled', 'Kin will now require authentication when opened');
+      } else {
+        await disableAuth();
+        Alert.alert('App Lock Disabled', 'Kin will no longer require authentication');
+      }
+    } catch (error) {
+      console.error('Auth toggle error:', error);
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to change authentication setting');
+    }
+  };
+
+  const getAuthTypeLabel = (): string => {
+    if (Platform.OS === 'web') return 'Not available on web';
+    if (supportedAuthTypes.length === 0) return 'Not available';
+    
+    const types = supportedAuthTypes.map(type => {
+      switch (type) {
+        case LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION:
+          return 'Face ID';
+        case LocalAuthentication.AuthenticationType.FINGERPRINT:
+          return 'Touch ID';
+        case LocalAuthentication.AuthenticationType.IRIS:
+          return 'Iris';
+        default:
+          return 'Biometric';
+      }
+    });
+    
+    return types.join(', ');
   };
 
   const showPrivacyInfo = () => {
@@ -170,10 +255,17 @@ export const SettingsScreen: React.FC = () => {
         },
         {
           icon: <Download size={20} color="#27AE60" />,
-          label: 'Export Database',
-          subtitle: 'Export all data to local files',
+          label: 'Export to Files',
+          subtitle: 'Export all data to Files app',
           type: 'action',
           onPress: handleExport,
+        },
+        {
+          icon: <Upload size={20} color="#3498DB" />,
+          label: 'Import from Files',
+          subtitle: 'Import data from Files app',
+          type: 'action',
+          onPress: handleImport,
         },
       ],
     },
@@ -239,11 +331,12 @@ export const SettingsScreen: React.FC = () => {
       title: 'Security',
       items: [
         {
-          icon: <Lock size={20} color="#E74C3C" />,
-          label: 'Face ID App Lock',
+          icon: <Lock size={20} color={isAuthEnabled ? "#27AE60" : "#95A5A6"} />,
+          label: 'App Lock',
+          subtitle: getAuthTypeLabel(),
           type: 'switch',
-          value: faceIdEnabled,
-          onValueChange: setFaceIdEnabled,
+          value: isAuthEnabled,
+          onValueChange: handleAuthToggle,
         },
       ],
     },

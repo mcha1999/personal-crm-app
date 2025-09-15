@@ -4,6 +4,8 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { DatabaseProvider, useDatabase } from "@/contexts/DatabaseContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AuthScreen } from "@/components/AuthScreen";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 
 SplashScreen.preventAutoHideAsync();
@@ -20,12 +22,13 @@ function RootLayoutNav() {
 
 function AppContent() {
   const { isInitialized, error } = useDatabase();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (isInitialized) {
+    if (isInitialized && !authLoading) {
       SplashScreen.hideAsync();
     }
-  }, [isInitialized]);
+  }, [isInitialized, authLoading]);
 
   if (error) {
     return (
@@ -36,13 +39,19 @@ function AppContent() {
     );
   }
 
-  if (!isInitialized) {
+  if (!isInitialized || authLoading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Initializing...</Text>
+        <Text style={styles.loadingText}>
+          {!isInitialized ? 'Initializing...' : 'Checking authentication...'}
+        </Text>
       </View>
     );
+  }
+
+  if (!isAuthenticated) {
+    return <AuthScreen />;
   }
 
   return <RootLayoutNav />;
@@ -51,11 +60,13 @@ function AppContent() {
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
-      <DatabaseProvider>
-        <GestureHandlerRootView style={styles.rootView}>
-          <AppContent />
-        </GestureHandlerRootView>
-      </DatabaseProvider>
+      <AuthProvider>
+        <DatabaseProvider>
+          <GestureHandlerRootView style={styles.rootView}>
+            <AppContent />
+          </GestureHandlerRootView>
+        </DatabaseProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
