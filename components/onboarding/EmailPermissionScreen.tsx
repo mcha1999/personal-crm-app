@@ -1,0 +1,415 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+  ScrollView,
+} from 'react-native';
+import { Mail, CheckCircle, AlertCircle, Forward, Zap } from 'lucide-react-native';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+
+export function EmailPermissionScreen() {
+  const { setEmailMethod, steps } = useOnboarding();
+  const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
+  
+  const currentStep = steps.find(step => step.id === 'email');
+  const isCompleted = currentStep?.completed || false;
+
+  const emailMethods = [
+    {
+      id: 'manual',
+      title: 'Manual Logging',
+      description: 'Manually log important email interactions',
+      icon: Mail,
+      details: 'Quick and private - log emails when they matter for relationship tracking',
+      recommended: true,
+    },
+    {
+      id: 'shortcuts',
+      title: 'iOS Shortcuts Integration',
+      description: 'Use iOS Shortcuts to extract email data',
+      icon: Zap,
+      details: 'Set up shortcuts to automatically capture email metadata on-device',
+      comingSoon: true,
+    },
+    {
+      id: 'forward',
+      title: 'Email Forwarding',
+      description: 'Forward important emails to track interactions',
+      icon: Forward,
+      details: 'Forward or BCC emails to a special address for processing',
+      comingSoon: true,
+    },
+  ];
+
+  const handleMethodSelect = (methodId: string) => {
+    setSelectedMethod(methodId);
+  };
+
+  const handleContinue = async () => {
+    if (selectedMethod && (selectedMethod === 'manual' || selectedMethod === 'shortcuts' || selectedMethod === 'forward')) {
+      await setEmailMethod(selectedMethod);
+    }
+  };
+
+  const handleSkip = async () => {
+    // Skip email tracking entirely
+    await setEmailMethod('manual'); // Set to manual but mark as skipped in preferences
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <View style={[styles.iconContainer, isCompleted && styles.iconContainerSuccess]}>
+            {isCompleted ? (
+              <CheckCircle size={48} color="#34C759" />
+            ) : (
+              <Mail size={48} color="#007AFF" />
+            )}
+          </View>
+          <Text style={styles.title}>Email Intelligence</Text>
+          <Text style={styles.subtitle}>
+            {isCompleted 
+              ? 'Email tracking configured!'
+              : 'Choose how to track email interactions with your contacts'
+            }
+          </Text>
+        </View>
+
+        <View style={styles.explanation}>
+          <Text style={styles.explanationTitle}>Privacy-First Email Tracking</Text>
+          <Text style={styles.explanationText}>
+            Unlike cloud-based solutions, Kin processes your email data entirely on your device using Apple Intelligence and local ML.
+          </Text>
+        </View>
+
+        <View style={styles.privacyCard}>
+          <AlertCircle size={20} color="#FF9500" />
+          <View style={styles.privacyContent}>
+            <Text style={styles.privacyTitle}>Important: iOS Email Limitations</Text>
+            <Text style={styles.privacyText}>
+              iOS doesn&apos;t allow direct access to Mail.app data. We offer privacy-focused alternatives that work entirely on your device.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.methodsContainer}>
+          <Text style={styles.methodsTitle}>Choose Your Method</Text>
+          
+          {emailMethods.map((method) => {
+            const IconComponent = method.icon;
+            const isSelected = selectedMethod === method.id;
+            
+            return (
+              <TouchableOpacity
+                key={method.id}
+                style={[
+                  styles.methodCard,
+                  isSelected && styles.methodCardSelected,
+                  method.comingSoon && styles.methodCardDisabled,
+                ]}
+                onPress={() => !method.comingSoon && handleMethodSelect(method.id)}
+                disabled={method.comingSoon}
+              >
+                <View style={styles.methodHeader}>
+                  <View style={styles.methodIconContainer}>
+                    <IconComponent 
+                      size={24} 
+                      color={method.comingSoon ? '#999' : isSelected ? '#007AFF' : '#666'} 
+                    />
+                  </View>
+                  <View style={styles.methodInfo}>
+                    <View style={styles.methodTitleRow}>
+                      <Text style={[
+                        styles.methodTitle,
+                        method.comingSoon && styles.methodTitleDisabled,
+                        isSelected && styles.methodTitleSelected,
+                      ]}>
+                        {method.title}
+                      </Text>
+                      {method.recommended && (
+                        <View style={styles.recommendedBadge}>
+                          <Text style={styles.recommendedText}>Recommended</Text>
+                        </View>
+                      )}
+                      {method.comingSoon && (
+                        <View style={styles.comingSoonBadge}>
+                          <Text style={styles.comingSoonText}>Coming Soon</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[
+                      styles.methodDescription,
+                      method.comingSoon && styles.methodDescriptionDisabled,
+                    ]}>
+                      {method.description}
+                    </Text>
+                    <Text style={[
+                      styles.methodDetails,
+                      method.comingSoon && styles.methodDetailsDisabled,
+                    ]}>
+                      {method.details}
+                    </Text>
+                  </View>
+                </View>
+                
+                {isSelected && (
+                  <View style={styles.selectedIndicator}>
+                    <CheckCircle size={20} color="#007AFF" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        {!isCompleted && (
+          <>
+            <TouchableOpacity 
+              style={[
+                styles.primaryButton,
+                !selectedMethod && styles.buttonDisabled,
+              ]} 
+              onPress={handleContinue}
+              disabled={!selectedMethod}
+            >
+              <Text style={styles.primaryButtonText}>Continue</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.secondaryButton} 
+              onPress={handleSkip}
+            >
+              <Text style={styles.secondaryButtonText}>Skip Email Tracking</Text>
+            </TouchableOpacity>
+          </>
+        )}
+        
+        {isCompleted && (
+          <TouchableOpacity style={styles.primaryButton} onPress={() => {}}>
+            <Text style={styles.primaryButtonText}>Continue</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  iconContainerSuccess: {
+    backgroundColor: '#E8F5E8',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 16,
+  },
+  explanation: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+  },
+  explanationTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 12,
+  },
+  explanationText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  privacyCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF9E6',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#FFE066',
+  },
+  privacyContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  privacyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  privacyText: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+  },
+  methodsContainer: {
+    marginBottom: 32,
+  },
+  methodsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 16,
+  },
+  methodCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  methodCardSelected: {
+    borderColor: '#007AFF',
+    backgroundColor: '#F0F8FF',
+  },
+  methodCardDisabled: {
+    backgroundColor: '#F5F5F5',
+    opacity: 0.6,
+  },
+  methodHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  methodIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  methodInfo: {
+    flex: 1,
+  },
+  methodTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  methodTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginRight: 8,
+  },
+  methodTitleSelected: {
+    color: '#007AFF',
+  },
+  methodTitleDisabled: {
+    color: '#999',
+  },
+  recommendedBadge: {
+    backgroundColor: '#34C759',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  recommendedText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  comingSoonBadge: {
+    backgroundColor: '#FF9500',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  comingSoonText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  methodDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  methodDescriptionDisabled: {
+    color: '#999',
+  },
+  methodDetails: {
+    fontSize: 12,
+    color: '#888',
+    lineHeight: 16,
+  },
+  methodDetailsDisabled: {
+    color: '#BBB',
+  },
+  selectedIndicator: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  footer: {
+    padding: 24,
+    paddingBottom: 32,
+  },
+  primaryButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+});

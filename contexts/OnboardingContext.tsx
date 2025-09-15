@@ -13,7 +13,8 @@ export interface SyncPreferences {
   contactsEnabled: boolean;
   calendarEnabled: boolean;
   calendarSource: 'eventkit' | 'google' | null;
-  gmailEnabled: boolean;
+  emailEnabled: boolean;
+  emailMethod: 'manual' | 'shortcuts' | 'forward' | null;
   syncWindowDays: number;
   gmailAccessToken?: string;
   gmailRefreshToken?: string;
@@ -33,7 +34,8 @@ const defaultSyncPreferences: SyncPreferences = {
   contactsEnabled: false,
   calendarEnabled: false,
   calendarSource: null,
-  gmailEnabled: false,
+  emailEnabled: false,
+  emailMethod: null,
   syncWindowDays: 30,
 };
 
@@ -65,9 +67,9 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
       inProgress: false,
     },
     {
-      id: 'gmail',
-      title: 'Gmail Connection',
-      description: 'Connect Gmail for email interaction tracking',
+      id: 'email',
+      title: 'Email Intelligence',
+      description: 'Choose how to track email interactions',
       completed: false,
       inProgress: false,
     },
@@ -232,37 +234,22 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
     }
   }, [completeStep, setStepInProgress, setStepError]);
 
-  const connectGmail = useCallback(async (): Promise<boolean> => {
+  const setEmailMethod = useCallback(async (method: 'manual' | 'shortcuts' | 'forward'): Promise<void> => {
     try {
-      console.log('[Onboarding] Connecting to Gmail...');
-      setStepInProgress('gmail');
+      console.log('[Onboarding] Setting email method to:', method);
       
-      const gmailSync = GmailSync.getInstance();
-      const success = await gmailSync.authenticate();
+      setSyncPreferences(prev => ({ 
+        ...prev, 
+        emailEnabled: true,
+        emailMethod: method
+      }));
       
-      if (success) {
-        setSyncPreferences(prev => ({ 
-          ...prev, 
-          gmailEnabled: true
-        }));
-        
-        completeStep('gmail', false);
-        return true;
-      } else {
-        // Gmail sync requires proper OAuth setup
-        setStepError('gmail', 'Gmail integration requires Google OAuth setup. This feature will be available once configured.');
-        // Mark as completed but skipped
-        setTimeout(() => {
-          completeStep('gmail', true);
-        }, 2000);
-        return false;
-      }
+      completeStep('email', false);
     } catch (error) {
-      console.error('[Onboarding] Error connecting Gmail:', error);
-      setStepError('gmail', 'Failed to connect Gmail. You can set this up later in Settings.');
-      return false;
+      console.error('[Onboarding] Error setting email method:', error);
+      setStepError('email', 'Failed to configure email tracking');
     }
-  }, [completeStep, setStepInProgress, setStepError]);
+  }, [completeStep, setStepError]);
 
   const setSyncWindow = useCallback(async (days: number): Promise<void> => {
     try {
@@ -327,7 +314,7 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
     syncPreferences,
     requestContactsPermission,
     requestCalendarPermission,
-    connectGmail,
+    setEmailMethod,
     setSyncWindow,
     completeOnboarding,
     resetOnboarding,
@@ -342,7 +329,7 @@ export const [OnboardingProvider, useOnboarding] = createContextHook(() => {
     syncPreferences,
     requestContactsPermission,
     requestCalendarPermission,
-    connectGmail,
+    setEmailMethod,
     setSyncWindow,
     completeOnboarding,
     resetOnboarding,

@@ -12,7 +12,7 @@ import { useOnboarding } from '@/contexts/OnboardingContext';
 import { PrivacyScreen } from './onboarding/PrivacyScreen';
 import { ContactsPermissionScreen } from './onboarding/ContactsPermissionScreen';
 import { CalendarPermissionScreen } from './onboarding/CalendarPermissionScreen';
-import { GmailConnectionScreen } from './onboarding/GmailConnectionScreen';
+import { EmailPermissionScreen } from './onboarding/EmailPermissionScreen';
 import { SyncWindowScreen } from './onboarding/SyncWindowScreen';
 
 export function OnboardingFlow() {
@@ -63,8 +63,8 @@ export function OnboardingFlow() {
         return <ContactsPermissionScreen />;
       case 'calendar':
         return <CalendarPermissionScreen />;
-      case 'gmail':
-        return <GmailConnectionScreen />;
+      case 'email':
+        return <EmailPermissionScreen />;
       case 'sync-window':
         return <SyncWindowScreen />;
       default:
