@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Animated, TouchableOpacity, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RefreshCw } from 'lucide-react-native';
@@ -41,7 +41,8 @@ export const TodayScreen: React.FC = () => {
   const [meetingInteractions, setMeetingInteractions] = useState<Map<string, Interaction[]>>(new Map());
   const [peopleMap, setPeopleMap] = useState<Map<string, Person>>(new Map());
   const [scoresMap, setScoresMap] = useState<Map<string, PersonScore>>(new Map());
-  const fadeAnim = new Animated.Value(0);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   const personDAO = new PersonDAO();
   const taskDAO = new TaskDAO();
@@ -192,6 +193,15 @@ export const TodayScreen: React.FC = () => {
     if (manualRefreshing) return;
     
     setManualRefreshing(true);
+    
+    // Start rotation animation
+    Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      })
+    ).start();
     try {
       const taskManager = BackgroundTaskManager.getInstance();
       const result = await taskManager.manualRefresh();
@@ -225,6 +235,8 @@ export const TodayScreen: React.FC = () => {
       Alert.alert('Refresh Failed', 'Could not complete manual refresh');
     } finally {
       setManualRefreshing(false);
+      rotateAnim.stopAnimation();
+      rotateAnim.setValue(0);
     }
   };
 
@@ -237,31 +249,41 @@ export const TodayScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerContainer}>
-        <GradientHeader
-          title={getGreeting()}
-          subtitle={new Date().toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            month: 'long', 
-            day: 'numeric' 
-          })}
-        />
-        <TouchableOpacity
-          style={styles.refreshButton}
-          onPress={onManualRefresh}
-          disabled={manualRefreshing}
-          activeOpacity={0.7}
-        >
-          <RefreshCw 
-            size={20} 
-            color={manualRefreshing ? '#95A5A6' : '#FFFFFF'} 
-            style={[styles.refreshIcon, manualRefreshing && styles.refreshIconSpinning]}
-          />
-          <Text style={[styles.refreshText, manualRefreshing && styles.refreshTextDisabled]}>
-            {manualRefreshing ? 'Refreshing...' : 'Refresh Now'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <GradientHeader
+        title={getGreeting()}
+        subtitle={new Date().toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          month: 'long', 
+          day: 'numeric' 
+        })}
+        rightComponent={
+          <TouchableOpacity
+            style={styles.refreshButton}
+            onPress={onManualRefresh}
+            disabled={manualRefreshing}
+            activeOpacity={0.7}
+          >
+            <Animated.View
+              style={{
+                transform: [{
+                  rotate: rotateAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '360deg'],
+                  }),
+                }],
+              }}
+            >
+              <RefreshCw 
+                size={20} 
+                color={manualRefreshing ? '#95A5A6' : '#FFFFFF'} 
+              />
+            </Animated.View>
+            <Text style={[styles.refreshText, manualRefreshing && styles.refreshTextDisabled]}>
+              {manualRefreshing ? 'Syncing' : 'Refresh'}
+            </Text>
+          </TouchableOpacity>
+        }
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -387,13 +409,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  headerContainer: {
-    position: 'relative',
-  },
   refreshButton: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -403,16 +419,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
-  refreshIcon: {
-    marginRight: 6,
-  },
-  refreshIconSpinning: {
-    opacity: 0.6,
-  },
   refreshText: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '600' as const,
+    marginLeft: 6,
   },
   refreshTextDisabled: {
     color: '#95A5A6',

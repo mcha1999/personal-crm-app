@@ -12,6 +12,7 @@ export interface Person {
   notes?: string;
   companyId?: string;
   lastInteraction?: Date;
+  cadence?: number; // Target days between interactions
   createdAt: Date;
   updatedAt: Date;
 }

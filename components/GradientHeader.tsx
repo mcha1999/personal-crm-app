@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ViewStyle, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/constants/theme';
@@ -9,6 +9,7 @@ interface GradientHeaderProps {
   subtitle?: string;
   rightComponent?: React.ReactNode;
   style?: ViewStyle;
+  colors?: string[];
 }
 
 export const GradientHeader: React.FC<GradientHeaderProps> = ({
@@ -16,21 +17,52 @@ export const GradientHeader: React.FC<GradientHeaderProps> = ({
   subtitle,
   rightComponent,
   style,
+  colors,
 }) => {
   const insets = useSafeAreaInsets();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 20,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const gradientColors = colors && colors.length >= 2 
+    ? colors 
+    : [theme.colors.gradientStart, theme.colors.gradientEnd];
 
   return (
     <LinearGradient
-      colors={[theme.colors.gradientStart, theme.colors.gradientEnd]}
+      colors={gradientColors as [string, string, ...string[]]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.container, { paddingTop: insets.top + theme.spacing.md }, style]}
     >
       <View style={styles.content}>
-        <View style={styles.textContainer}>
+        <Animated.View
+          style={[
+            styles.textContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
           <Text style={styles.title}>{title}</Text>
           {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
-        </View>
+        </Animated.View>
         {rightComponent && <View style={styles.rightContainer}>{rightComponent}</View>}
       </View>
     </LinearGradient>

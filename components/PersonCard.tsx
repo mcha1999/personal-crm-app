@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Animated } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { Person } from '@/models/Person';
 import { PersonScore } from '@/models/PersonScore';
 import { theme } from '@/constants/theme';
@@ -11,7 +12,25 @@ interface PersonCardProps {
 }
 
 export const PersonCard: React.FC<PersonCardProps> = ({ person, score, onPress }) => {
-  const scaleAnim = new Animated.Value(1);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 20,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
   const getRelationshipColor = () => {
     switch (person.relationship) {
       case 'family': return theme.colors.secondary;
@@ -47,6 +66,21 @@ export const PersonCard: React.FC<PersonCardProps> = ({ person, score, onPress }
     return `${Math.floor(days / 30)} months ago`;
   };
 
+  const getCadenceProgress = () => {
+    if (!person.cadence || !person.lastInteraction) return 0;
+    const daysSinceInteraction = Math.floor(
+      (new Date().getTime() - person.lastInteraction.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const progress = Math.max(0, Math.min(1, 1 - daysSinceInteraction / person.cadence));
+    return progress;
+  };
+
+  const progress = getCadenceProgress();
+  const strokeWidth = 3;
+  const radius = 32;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference * (1 - progress);
+
   return (
     <TouchableOpacity 
       onPress={onPress} 
@@ -56,13 +90,46 @@ export const PersonCard: React.FC<PersonCardProps> = ({ person, score, onPress }
     >
       <Animated.View style={[
         styles.container,
-        { transform: [{ scale: scaleAnim }] }
+        { 
+          transform: [{ scale: scaleAnim }, { translateY: slideAnim }],
+          opacity: fadeAnim,
+        }
       ]}>
       <View style={styles.header}>
-        <Image 
-          source={{ uri: person.avatar || 'https://via.placeholder.com/100' }} 
-          style={styles.avatar}
-        />
+        <View style={styles.avatarContainer}>
+          <Image 
+            source={{ uri: person.avatar || 'https://via.placeholder.com/100' }} 
+            style={styles.avatar}
+          />
+          {person.cadence && (
+            <Svg
+              style={styles.progressRing}
+              width={70}
+              height={70}
+            >
+              <Circle
+                cx="35"
+                cy="35"
+                r={radius}
+                stroke={theme.colors.border}
+                strokeWidth={strokeWidth}
+                fill="none"
+              />
+              <Circle
+                cx="35"
+                cy="35"
+                r={radius}
+                stroke={progress > 0.3 ? theme.colors.success : theme.colors.error}
+                strokeWidth={strokeWidth}
+                fill="none"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                transform="rotate(-90 35 35)"
+              />
+            </Svg>
+          )}
+        </View>
         <View style={styles.info}>
           <View style={styles.nameRow}>
             <Text style={styles.name}>
@@ -103,23 +170,33 @@ export const PersonCard: React.FC<PersonCardProps> = ({ person, score, onPress }
 const styles = StyleSheet.create({
   container: {
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
+    borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.md,
     marginHorizontal: theme.spacing.md,
     marginVertical: theme.spacing.sm,
     ...theme.shadows.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border + '20',
   },
   header: {
     flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    width: 70,
+    height: 70,
+    marginRight: theme.spacing.md,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   avatar: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    marginRight: theme.spacing.md,
-    borderWidth: 2,
-    borderColor: theme.colors.border,
+    position: 'absolute' as const,
+  },
+  progressRing: {
+    position: 'absolute' as const,
   },
   info: {
     flex: 1,

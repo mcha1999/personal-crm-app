@@ -3,7 +3,6 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  FlatList, 
   RefreshControl,
   TouchableOpacity,
   Animated,
@@ -11,6 +10,7 @@ import {
   Dimensions,
   Image,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { PersonDAO } from '@/database/PersonDAO';
 import { PersonScoreDAO } from '@/database/PersonScoreDAO';
 import { InteractionDAO } from '@/database/InteractionDAO';
@@ -315,13 +315,14 @@ export const RecentsScreen: React.FC = () => {
         subtitle="Stay connected with everyone"
       />
 
-      <FlatList
+      <FlashList
         data={filteredPeople}
         renderItem={renderPerson}
         keyExtractor={item => item.person.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        estimatedItemSize={100}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No recent contacts</Text>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TextInput, RefreshControl } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { PersonRepository } from '@/repositories/PersonRepository';
 import { PersonCard } from '@/components/PersonCard';
 import { Person } from '@/models/Person';
@@ -8,6 +8,9 @@ import { PersonScore } from '@/models/PersonScore';
 import { mockPersonScores } from '@/repositories/mockData';
 import { Search } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { GradientHeader } from '@/components/GradientHeader';
+import { EmptyState } from '@/components/EmptyState';
+import { theme } from '@/constants/theme';
 
 export const ContactsScreen: React.FC = () => {
   const router = useRouter();
@@ -71,87 +74,69 @@ export const ContactsScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Contacts</Text>
-        <View style={styles.searchContainer}>
-          <Search size={20} color="#95A5A6" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search by name or tag..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor="#95A5A6"
-          />
-        </View>
+    <View style={styles.container}>
+      <GradientHeader
+        title="Contacts"
+        subtitle={`${filteredPeople.length} ${filteredPeople.length === 1 ? 'person' : 'people'}`}
+        colors={[theme.colors.primary, theme.colors.secondary]}
+      />
+      
+      <View style={styles.searchContainer}>
+        <Search size={20} color={theme.colors.textSecondary} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by name or tag..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor={theme.colors.textLight}
+        />
       </View>
 
-      <FlatList
+      <FlashList
         data={filteredPeople}
         renderItem={renderPerson}
         keyExtractor={item => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        estimatedItemSize={120}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              {searchQuery ? 'No contacts found' : 'No contacts yet'}
-            </Text>
-          </View>
+          <EmptyState
+            title={searchQuery ? 'No contacts found' : 'No contacts yet'}
+            subtitle={searchQuery ? 'Try a different search term' : 'Start adding people to stay connected'}
+          />
         }
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F3F7',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-    marginBottom: 16,
+    backgroundColor: theme.colors.background,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 44,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
+    paddingHorizontal: theme.spacing.md,
+    marginHorizontal: theme.spacing.lg,
+    marginVertical: theme.spacing.md,
+    height: 48,
+    ...theme.shadows.sm,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: theme.spacing.sm,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    color: '#2C3E50',
+    ...theme.typography.body,
+    color: theme.colors.text,
   },
   listContent: {
-    paddingVertical: 8,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 100,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#95A5A6',
+    paddingVertical: theme.spacing.sm,
   },
 });
