@@ -3,7 +3,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { ContactsIngest } from '@/services/ContactsIngest';
 import { ContactsListener } from '@/services/ContactsListener';
 import { PersonDAO } from '@/database/PersonDAO';
-import { useDatabase } from './DatabaseContext';
+import { Database } from '@/database/Database';
 
 interface ContactsState {
   isImporting: boolean;
@@ -13,7 +13,7 @@ interface ContactsState {
 }
 
 export const [ContactsProvider, useContacts] = createContextHook(() => {
-  const { isInitialized } = useDatabase();
+  const database = Database.getInstance();
   const personDAO = useMemo(() => new PersonDAO(), []);
   const contactsListener = useMemo(() => ContactsListener.getInstance(), []);
   const [state, setState] = useState<ContactsState>({
@@ -25,17 +25,17 @@ export const [ContactsProvider, useContacts] = createContextHook(() => {
 
   // Start listening for contacts changes when database is ready
   useEffect(() => {
-    if (isInitialized) {
+    if (database.isAvailable()) {
       contactsListener.startListening();
       
       return () => {
         contactsListener.stopListening();
       };
     }
-  }, [isInitialized, contactsListener]);
+  }, [contactsListener, database]);
 
   const importContacts = useCallback(async () => {
-    if (state.isImporting || !isInitialized) return;
+    if (state.isImporting || !database.isAvailable()) return;
 
     console.log('ContactsContext: Starting contacts import');
     setState(prev => ({ ...prev, isImporting: true, error: null }));
@@ -66,7 +66,7 @@ export const [ContactsProvider, useContacts] = createContextHook(() => {
       
       throw error;
     }
-  }, [personDAO, state.isImporting, isInitialized]);
+  }, [personDAO, state.isImporting, database]);
 
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
