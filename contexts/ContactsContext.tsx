@@ -12,7 +12,7 @@ interface ContactsState {
   error: string | null;
 }
 
-export const [ContactsContext, useContacts] = createContextHook(() => {
+export const [ContactsProvider, useContacts] = createContextHook(() => {
   const { isInitialized } = useDatabase();
   const personDAO = useMemo(() => new PersonDAO(), []);
   const contactsListener = useMemo(() => ContactsListener.getInstance(), []);
