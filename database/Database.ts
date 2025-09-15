@@ -176,6 +176,7 @@ export class Database {
       CREATE TABLE IF NOT EXISTS places (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        normalizedName TEXT NOT NULL,
         address TEXT,
         latitude REAL,
         longitude REAL,
@@ -263,10 +264,10 @@ export class Database {
       ('p4', 'Alex', 'Thompson', null, 'alex@example.com', '+1234567893', 'https://i.pravatar.cc/150?img=4', '1985-07-28', 'acquaintance', '[\"neighbor\"]', 'Neighbor', null, '${new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()}', '${now}', '${now}'),
       ('p5', 'Lisa', 'Wang', null, 'lisa@example.com', '+1234567894', 'https://i.pravatar.cc/150?img=5', '1991-12-05', 'friend', '[\"books\",\"reading\"]', 'Book club member', 'c1', '${new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()}', '${now}', '${now}');
 
-      INSERT INTO places (id, name, address, latitude, longitude, category, createdAt, updatedAt) VALUES
-      ('pl1', 'Central Coffee', '123 Main St', 37.7749, -122.4194, 'Coffee Shop', '${now}', '${now}'),
-      ('pl2', 'Green Park', '456 Park Ave', 37.7751, -122.4180, 'Park', '${now}', '${now}'),
-      ('pl3', 'The Italian Place', '789 Food St', 37.7740, -122.4200, 'Restaurant', '${now}', '${now}');
+      INSERT INTO places (id, name, normalizedName, address, latitude, longitude, category, createdAt, updatedAt) VALUES
+      ('pl1', 'Central Coffee', 'central coffee', '123 Main St', 37.7749, -122.4194, 'cafe', '${now}', '${now}'),
+      ('pl2', 'Green Park', 'green park', '456 Park Ave', 37.7751, -122.4180, 'park', '${now}', '${now}'),
+      ('pl3', 'The Italian Place', 'the italian place', '789 Food St', 37.7740, -122.4200, 'restaurant', '${now}', '${now}');
 
       INSERT INTO interactions (id, personId, type, date, notes, placeId, createdAt, updatedAt) VALUES
       ('i1', 'p1', 'meeting', '${new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()}', 'Coffee catch-up', 'pl1', '${now}', '${now}'),

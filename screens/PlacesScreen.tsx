@@ -1,26 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { PlaceRepository } from '@/repositories/PlaceRepository';
-import { Place } from '@/models/Place';
-import { MapPin, Coffee, Utensils, Home, Building2, Trees, MoreHorizontal } from 'lucide-react-native';
+import { PlaceWithStats } from '@/models/Place';
+import { PlaceDAO } from '@/database/PlaceDAO';
+import { useDatabase } from '@/contexts/DatabaseContext';
+import { MapPin, Coffee, Utensils, Home, Building2, Trees, Users, Calendar, TrendingUp } from 'lucide-react-native';
 
 export const PlacesScreen: React.FC = () => {
-  const [places, setPlaces] = useState<Place[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<Place['category'] | 'all'>('all');
+  const [places, setPlaces] = useState<PlaceWithStats[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'frequent'>('frequent');
+  const { database } = useDatabase();
 
-  const placeRepo = new PlaceRepository();
-
-  const loadData = async () => {
-    const allPlaces = await placeRepo.getAllPlaces();
-    setPlaces(allPlaces);
-  };
+  const loadData = useCallback(async () => {
+    if (!database?.isAvailable()) return;
+    
+    try {
+      const placeDAO = new PlaceDAO();
+      const frequentPlaces = await placeDAO.getFrequentPlaces(20);
+      setPlaces(frequentPlaces);
+    } catch (error) {
+      console.error('Failed to load places:', error);
+    }
+  }, [database]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
-  const getCategoryIcon = (category: Place['category']) => {
+  const getCategoryIcon = (category: PlaceWithStats['category']) => {
     switch (category) {
       case 'cafe': return <Coffee size={20} color="white" />;
       case 'restaurant': return <Utensils size={20} color="white" />;
@@ -31,7 +38,7 @@ export const PlacesScreen: React.FC = () => {
     }
   };
 
-  const getCategoryColor = (category: Place['category']) => {
+  const getCategoryColor = (category: PlaceWithStats['category']) => {
     switch (category) {
       case 'cafe': return '#8B4513';
       case 'restaurant': return '#FF6B6B';
@@ -42,63 +49,130 @@ export const PlacesScreen: React.FC = () => {
     }
   };
 
-  const categories: Array<{ key: Place['category'] | 'all'; label: string }> = [
-    { key: 'all', label: 'All' },
-    { key: 'restaurant', label: 'Restaurants' },
-    { key: 'cafe', label: 'Cafes' },
-    { key: 'park', label: 'Parks' },
-    { key: 'office', label: 'Offices' },
-    { key: 'home', label: 'Homes' },
+  const categories: { key: 'all' | 'frequent'; label: string; icon: any }[] = [
+    { key: 'frequent', label: 'Most Visited', icon: TrendingUp },
+    { key: 'all', label: 'All Places', icon: MapPin },
   ];
 
-  const filteredPlaces = selectedCategory === 'all' 
-    ? places 
-    : places.filter(p => p.category === selectedCategory);
+  const filteredPlaces = places;
+
+  const formatLastVisit = (date: Date) => {
+    const now = new Date();
+    const diffTime = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    return `${Math.floor(diffDays / 30)} months ago`;
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Places</Text>
-        <Text style={styles.subtitle}>Where you meet and connect</Text>
+        <Text style={styles.subtitle}>Your frequent meeting spots</Text>
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{places.length}</Text>
+            <Text style={styles.statLabel}>Venues</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{places.reduce((sum, p) => sum + p.visitCount, 0)}</Text>
+            <Text style={styles.statLabel}>Total Visits</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{places.reduce((sum, p) => sum + p.peopleCount, 0)}</Text>
+            <Text style={styles.statLabel}>People Met</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterContainer}>
-        {categories.map(cat => (
-          <TouchableOpacity
-            key={cat.key}
-            style={[
-              styles.filterChip,
-              selectedCategory === cat.key && styles.filterChipActive
-            ]}
-            onPress={() => setSelectedCategory(cat.key)}
-          >
-            <Text style={[
-              styles.filterText,
-              selectedCategory === cat.key && styles.filterTextActive
-            ]}>
-              {cat.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {categories.map(cat => {
+          const IconComponent = cat.icon;
+          return (
+            <TouchableOpacity
+              key={cat.key}
+              style={[
+                styles.filterChip,
+                selectedCategory === cat.key && styles.filterChipActive
+              ]}
+              onPress={() => setSelectedCategory(cat.key)}
+            >
+              <IconComponent 
+                size={16} 
+                color={selectedCategory === cat.key ? 'white' : '#7F8C8D'} 
+                style={styles.filterIcon}
+              />
+              <Text style={[
+                styles.filterText,
+                selectedCategory === cat.key && styles.filterTextActive
+              ]}>
+                {cat.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
       <ScrollView style={styles.placesList}>
-        {filteredPlaces.map(place => (
-          <TouchableOpacity key={place.id} style={styles.placeCard} activeOpacity={0.7}>
-            <View style={[styles.iconContainer, { backgroundColor: getCategoryColor(place.category) }]}>
-              {getCategoryIcon(place.category)}
-            </View>
-            <View style={styles.placeInfo}>
-              <Text style={styles.placeName}>{place.name}</Text>
-              {place.address && (
-                <Text style={styles.placeAddress}>{place.address}</Text>
-              )}
-              {place.notes && (
-                <Text style={styles.placeNotes}>{place.notes}</Text>
-              )}
-            </View>
-          </TouchableOpacity>
-        ))}
+        {filteredPlaces.length > 0 ? (
+          filteredPlaces.map((place, index) => (
+            <TouchableOpacity key={place.id} style={styles.placeCard} activeOpacity={0.7}>
+              <View style={styles.placeHeader}>
+                <View style={[styles.iconContainer, { backgroundColor: getCategoryColor(place.category) }]}>
+                  {getCategoryIcon(place.category)}
+                </View>
+                <View style={styles.placeInfo}>
+                  <Text style={styles.placeName}>{place.name}</Text>
+                  {place.address && (
+                    <Text style={styles.placeAddress}>{place.address}</Text>
+                  )}
+                </View>
+                <View style={styles.rankBadge}>
+                  <Text style={styles.rankText}>#{index + 1}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.placeStats}>
+                <View style={styles.statRow}>
+                  <View style={styles.statItem}>
+                    <Calendar size={14} color="#45B7D1" />
+                    <Text style={styles.statText}>{place.visitCount} visits</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Users size={14} color="#27AE60" />
+                    <Text style={styles.statText}>{place.peopleCount} people</Text>
+                  </View>
+                </View>
+                
+                {place.recentPeople.length > 0 && (
+                  <View style={styles.peopleRow}>
+                    <Text style={styles.peopleLabel}>Recent:</Text>
+                    <Text style={styles.peopleText}>
+                      {place.recentPeople.join(', ')}
+                      {place.peopleCount > place.recentPeople.length && 
+                        ` +${place.peopleCount - place.recentPeople.length} more`
+                      }
+                    </Text>
+                  </View>
+                )}
+                
+                <Text style={styles.lastVisit}>
+                  Last visit: {formatLastVisit(place.lastVisit)}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <MapPin size={48} color="#95A5A6" />
+            <Text style={styles.emptyTitle}>No places yet</Text>
+            <Text style={styles.emptySubtitle}>Places will appear here as you add interactions with locations</Text>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -134,6 +208,8 @@ const styles = StyleSheet.create({
     maxHeight: 60,
   },
   filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -157,7 +233,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   placeCard: {
-    flexDirection: 'row',
     backgroundColor: 'white',
     marginHorizontal: 16,
     marginVertical: 6,
@@ -195,5 +270,98 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#95A5A6',
     fontStyle: 'italic',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F3F7',
+  },
+  statItem: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: '#45B7D1',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#7F8C8D',
+    marginTop: 2,
+  },
+  filterIcon: {
+    marginRight: 6,
+  },
+  placeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  rankBadge: {
+    backgroundColor: '#E8F4F8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  rankText: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: '#45B7D1',
+  },
+  placeStats: {
+    gap: 8,
+  },
+  statRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  statText: {
+    fontSize: 12,
+    color: '#7F8C8D',
+    marginLeft: 4,
+  },
+  peopleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  peopleLabel: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: '#7F8C8D',
+  },
+  peopleText: {
+    fontSize: 12,
+    color: '#95A5A6',
+    flex: 1,
+  },
+  lastVisit: {
+    fontSize: 11,
+    color: '#BDC3C7',
+    fontStyle: 'italic',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    color: '#7F8C8D',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#95A5A6',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

@@ -121,4 +121,19 @@ export class AnnotationDAO extends BaseDAO<Annotation> {
 
     return await this.findById(id);
   }
+
+  async delete(id: string): Promise<boolean> {
+    if (!this.db || this.isWebPlatform) return false;
+
+    try {
+      await this.db.runAsync(
+        `DELETE FROM ${this.tableName} WHERE id = ?`,
+        [id]
+      );
+      return true;
+    } catch (error) {
+      console.error('Failed to delete annotation:', error);
+      return false;
+    }
+  }
 }

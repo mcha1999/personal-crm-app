@@ -1,9 +1,10 @@
 import { BaseDAO } from './BaseDAO';
-import { Place } from '../models/Place';
+import { Place, PlaceWithStats, normalizePlaceName } from '../models/Place';
 
 interface PlaceDB {
   id: string;
   name: string;
+  normalizedName: string;
   address: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -21,6 +22,7 @@ export class PlaceDAO extends BaseDAO<PlaceDB> {
     return {
       id: db.id,
       name: db.name,
+      normalizedName: db.normalizedName,
       address: db.address || undefined,
       latitude: db.latitude || 0,
       longitude: db.longitude || 0,
@@ -36,13 +38,15 @@ export class PlaceDAO extends BaseDAO<PlaceDB> {
     }
     const id = this.generateId();
     const now = this.getNow();
+    const normalizedName = normalizePlaceName(place.name);
     
     await this.db.runAsync(
-      `INSERT INTO places (id, name, address, latitude, longitude, category, createdAt, updatedAt) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO places (id, name, normalizedName, address, latitude, longitude, category, createdAt, updatedAt) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         place.name,
+        normalizedName,
         place.address || null,
         place.latitude || null,
         place.longitude || null,
@@ -65,6 +69,8 @@ export class PlaceDAO extends BaseDAO<PlaceDB> {
     if (place.name !== undefined) {
       fields.push('name = ?');
       values.push(place.name);
+      fields.push('normalizedName = ?');
+      values.push(normalizePlaceName(place.name));
     }
     if (place.address !== undefined) {
       fields.push('address = ?');
@@ -132,12 +138,22 @@ export class PlaceDAO extends BaseDAO<PlaceDB> {
     return (results || []).map(r => this.dbToPlace(r));
   }
 
-  async getFrequentPlaces(limit: number = 10): Promise<(Place & { visitCount: number; lastVisit: Date })[]> {
+  async getFrequentPlaces(limit: number = 10): Promise<PlaceWithStats[]> {
     if (!this.db || this.isWebPlatform) return [];
-    const results = await this.db.getAllAsync<PlaceDB & { visitCount: number; lastVisit: string }>(
-      `SELECT p.*, COUNT(i.id) as visitCount, MAX(i.date) as lastVisit
+    const results = await this.db.getAllAsync<PlaceDB & { 
+      visitCount: number; 
+      lastVisit: string;
+      peopleCount: number;
+      recentPeople: string;
+    }>(
+      `SELECT p.*, 
+              COUNT(DISTINCT i.id) as visitCount, 
+              MAX(i.date) as lastVisit,
+              COUNT(DISTINCT i.personId) as peopleCount,
+              GROUP_CONCAT(DISTINCT pr.firstName || ' ' || pr.lastName) as recentPeople
        FROM places p
        LEFT JOIN interactions i ON p.id = i.placeId
+       LEFT JOIN persons pr ON i.personId = pr.id
        GROUP BY p.id
        HAVING visitCount > 0
        ORDER BY visitCount DESC, lastVisit DESC
@@ -148,7 +164,50 @@ export class PlaceDAO extends BaseDAO<PlaceDB> {
     return (results || []).map(r => ({
       ...this.dbToPlace(r),
       visitCount: r.visitCount,
-      lastVisit: new Date(r.lastVisit)
+      lastVisit: new Date(r.lastVisit),
+      peopleCount: r.peopleCount,
+      recentPeople: r.recentPeople ? r.recentPeople.split(',').slice(0, 3) : []
     }));
+  }
+
+  async findOrCreateByNormalizedName(name: string, category: Place['category'] = 'other'): Promise<Place> {
+    if (!this.db || this.isWebPlatform) {
+      throw new Error('Database not available');
+    }
+    
+    const normalizedName = normalizePlaceName(name);
+    
+    const existing = await this.db.getFirstAsync<PlaceDB>(
+      `SELECT * FROM places WHERE normalizedName = ? LIMIT 1`,
+      [normalizedName]
+    );
+    
+    if (existing) {
+      return this.dbToPlace(existing);
+    }
+    
+    return this.create({
+      name,
+      normalizedName,
+      category,
+      latitude: 0,
+      longitude: 0
+    });
+  }
+
+  async getClusteredPlaces(): Promise<{ [normalizedName: string]: Place[] }> {
+    if (!this.db || this.isWebPlatform) return {};
+    
+    const places = await this.getAllPlaces();
+    const clusters: { [normalizedName: string]: Place[] } = {};
+    
+    places.forEach(place => {
+      if (!clusters[place.normalizedName]) {
+        clusters[place.normalizedName] = [];
+      }
+      clusters[place.normalizedName].push(place);
+    });
+    
+    return clusters;
   }
 }

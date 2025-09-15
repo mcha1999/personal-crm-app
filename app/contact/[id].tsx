@@ -18,6 +18,10 @@ import { TaskRepository } from '@/repositories/TaskRepository';
 import { Person } from '@/models/Person';
 import { Interaction } from '@/models/Interaction';
 import { Task } from '@/models/Task';
+import { Annotation } from '@/models/Annotation';
+import { AnnotationDAO } from '@/database/AnnotationDAO';
+import { useDatabase } from '@/contexts/DatabaseContext';
+import { AnnotationManager } from '@/components/AnnotationManager';
 import { mockPersonScores, mockMeetings, mockThreads, mockMessages } from '@/repositories/mockData';
 import { 
   ArrowLeft, 
@@ -31,6 +35,7 @@ import {
   Edit3,
   Plus,
   Clock,
+  User,
 } from 'lucide-react-native';
 
 export default function ContactScreen() {
@@ -39,8 +44,10 @@ export default function ContactScreen() {
   const [person, setPerson] = useState<Person | null>(null);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [notes, setNotes] = useState('');
   const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const { database } = useDatabase();
 
   const personRepo = new PersonRepository();
   const interactionRepo = new InteractionRepository();
@@ -69,6 +76,17 @@ export default function ContactScreen() {
     }
     setInteractions(interactionData);
     setTasks(taskData.filter(t => !t.completed));
+    
+    // Load annotations
+    if (database?.isAvailable()) {
+      try {
+        const annotationDAO = new AnnotationDAO();
+        const personAnnotations = await annotationDAO.findByEntity('person', id);
+        setAnnotations(personAnnotations);
+      } catch (error) {
+        console.error('Failed to load annotations:', error);
+      }
+    }
   };
 
   const getLastMetText = () => {
@@ -296,10 +314,23 @@ export default function ContactScreen() {
             )}
           </View>
 
+          {/* Annotations */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <User size={20} color="#45B7D1" />
+              <Text style={styles.sectionTitle}>Personal Details</Text>
+            </View>
+            <AnnotationManager
+              personId={id}
+              annotations={annotations}
+              onAnnotationsChange={setAnnotations}
+            />
+          </View>
+
           {/* Tags */}
           {person.tags.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Tags</Text>
+              <Text style={styles.sectionTitle}>Legacy Tags</Text>
               <View style={styles.tagsContainer}>
                 {person.tags.map(tag => (
                   <View key={tag} style={styles.tag}>
