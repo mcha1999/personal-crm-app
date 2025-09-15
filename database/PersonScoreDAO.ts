@@ -31,16 +31,18 @@ export class PersonScoreDAO extends BaseDAO<PersonScore> {
   }
 
   async findAll(): Promise<PersonScore[]> {
-    if (!this.db || this.isWebPlatform) return [];
-    const rows = await this.db.getAllAsync<PersonScoreRow>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return [];
+    const rows = await db.getAllAsync<PersonScoreRow>(
       `SELECT * FROM ${this.tableName} ORDER BY relationshipScore DESC`
     );
     return rows.map(row => this.mapRowToPersonScore(row));
   }
 
   async findById(id: string): Promise<PersonScore | null> {
-    if (!this.db || this.isWebPlatform) return null;
-    const row = await this.db.getFirstAsync<PersonScoreRow>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return null;
+    const row = await db.getFirstAsync<PersonScoreRow>(
       `SELECT * FROM ${this.tableName} WHERE id = ?`,
       [id]
     );
@@ -48,8 +50,9 @@ export class PersonScoreDAO extends BaseDAO<PersonScore> {
   }
 
   async findByPersonId(personId: string): Promise<PersonScore | null> {
-    if (!this.db || this.isWebPlatform) return null;
-    const row = await this.db.getFirstAsync<PersonScoreRow>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return null;
+    const row = await db.getFirstAsync<PersonScoreRow>(
       `SELECT * FROM ${this.tableName} WHERE personId = ?`,
       [personId]
     );
@@ -57,8 +60,9 @@ export class PersonScoreDAO extends BaseDAO<PersonScore> {
   }
 
   async findTopScores(limit: number = 10): Promise<PersonScore[]> {
-    if (!this.db || this.isWebPlatform) return [];
-    const rows = await this.db.getAllAsync<PersonScoreRow>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return [];
+    const rows = await db.getAllAsync<PersonScoreRow>(
       `SELECT * FROM ${this.tableName} ORDER BY relationshipScore DESC LIMIT ?`,
       [limit]
     );
@@ -66,14 +70,15 @@ export class PersonScoreDAO extends BaseDAO<PersonScore> {
   }
 
   async create(personScore: Omit<PersonScore, 'id' | 'createdAt' | 'updatedAt'>): Promise<PersonScore> {
-    if (!this.db || this.isWebPlatform) {
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) {
       throw new Error('Database not available');
     }
 
     const now = this.getNow();
     const id = this.generateId();
     
-    await this.db.runAsync(
+    await db.runAsync(
       `INSERT INTO ${this.tableName} (id, personId, relationshipScore, interactionFrequency, lastInteractionDaysAgo, totalInteractions, averageResponseTime, calculatedAt) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -96,14 +101,15 @@ export class PersonScoreDAO extends BaseDAO<PersonScore> {
   }
 
   async update(id: string, updates: Partial<Omit<PersonScore, 'id' | 'createdAt' | 'updatedAt'>>): Promise<PersonScore | null> {
-    if (!this.db || this.isWebPlatform) return null;
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return null;
 
     const existing = await this.findById(id);
     if (!existing) return null;
 
     const now = this.getNow();
     
-    await this.db.runAsync(
+    await db.runAsync(
       `UPDATE ${this.tableName} 
        SET personId = ?, relationshipScore = ?, interactionFrequency = ?, lastInteractionDaysAgo = ?, totalInteractions = ?, averageResponseTime = ?, calculatedAt = ?
        WHERE id = ?`,
@@ -123,7 +129,8 @@ export class PersonScoreDAO extends BaseDAO<PersonScore> {
   }
 
   async updateScore(personId: string, scoreChange: number): Promise<PersonScore | null> {
-    if (!this.db || this.isWebPlatform) return null;
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return null;
 
     let personScore = await this.findByPersonId(personId);
     
@@ -145,7 +152,8 @@ export class PersonScoreDAO extends BaseDAO<PersonScore> {
   }
 
   async incrementInteractionCount(personId: string): Promise<PersonScore | null> {
-    if (!this.db || this.isWebPlatform) return null;
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return null;
 
     let personScore = await this.findByPersonId(personId);
     

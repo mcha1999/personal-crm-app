@@ -31,13 +31,14 @@ export class InteractionDAO extends BaseDAO<InteractionDB> {
   }
 
   async create(interaction: Omit<Interaction, 'id' | 'createdAt' | 'updatedAt'>): Promise<Interaction> {
-    if (!this.db || this.isWebPlatform) {
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) {
       throw new Error('Database not available');
     }
     const id = this.generateId();
     const now = this.getNow();
     
-    await this.db.runAsync(
+    await db.runAsync(
       `INSERT INTO interactions (id, personId, type, date, notes, placeId, createdAt, updatedAt) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -58,8 +59,9 @@ export class InteractionDAO extends BaseDAO<InteractionDB> {
   }
 
   async getInteractionById(id: string): Promise<Interaction | null> {
-    if (!this.db || this.isWebPlatform) return null;
-    const result = await this.db.getFirstAsync<InteractionDB>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return null;
+    const result = await db.getFirstAsync<InteractionDB>(
       `SELECT * FROM interactions WHERE id = ?`,
       [id]
     );
@@ -67,20 +69,22 @@ export class InteractionDAO extends BaseDAO<InteractionDB> {
   }
 
   async getByPerson(personId: string, limit?: number): Promise<Interaction[]> {
-    if (!this.db || this.isWebPlatform) return [];
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return [];
     const query = limit 
       ? `SELECT * FROM interactions WHERE personId = ? ORDER BY date DESC LIMIT ?`
       : `SELECT * FROM interactions WHERE personId = ? ORDER BY date DESC`;
     
     const params = limit ? [personId, limit] : [personId];
     
-    const results = await this.db.getAllAsync<InteractionDB>(query, params);
+    const results = await db.getAllAsync<InteractionDB>(query, params);
     return (results || []).map(r => this.dbToInteraction(r));
   }
 
   async getByPlace(placeId: string): Promise<Interaction[]> {
-    if (!this.db || this.isWebPlatform) return [];
-    const results = await this.db.getAllAsync<InteractionDB>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return [];
+    const results = await db.getAllAsync<InteractionDB>(
       `SELECT * FROM interactions WHERE placeId = ? ORDER BY date DESC`,
       [placeId]
     );
@@ -88,8 +92,9 @@ export class InteractionDAO extends BaseDAO<InteractionDB> {
   }
 
   async getRecent(limit: number = 20): Promise<Interaction[]> {
-    if (!this.db || this.isWebPlatform) return [];
-    const results = await this.db.getAllAsync<InteractionDB>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return [];
+    const results = await db.getAllAsync<InteractionDB>(
       `SELECT * FROM interactions ORDER BY date DESC LIMIT ?`,
       [limit]
     );
@@ -104,8 +109,9 @@ export class InteractionDAO extends BaseDAO<InteractionDB> {
       notes
     });
 
-    if (this.db && !this.isWebPlatform) {
-      await this.db.runAsync(
+    const db = this.ensureDatabase();
+    if (db && !this.isWebPlatform) {
+      await db.runAsync(
       `UPDATE persons SET lastInteraction = ? WHERE id = ?`,
         [new Date().toISOString(), personId]
       );
@@ -115,9 +121,10 @@ export class InteractionDAO extends BaseDAO<InteractionDB> {
   }
 
   async findByPersonAndDate(personId: string, date: Date): Promise<Interaction | null> {
-    if (!this.db || this.isWebPlatform) return null;
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return null;
     const dateStr = date.toISOString().split('T')[0]; // Get date part only
-    const result = await this.db.getFirstAsync<InteractionDB>(
+    const result = await db.getFirstAsync<InteractionDB>(
       `SELECT * FROM interactions 
        WHERE personId = ? AND date(date) = date(?)
        ORDER BY date DESC LIMIT 1`,

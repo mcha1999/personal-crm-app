@@ -77,14 +77,15 @@ export class PersonDAO extends BaseDAO<PersonDB> {
   }
 
   async create(person: Omit<Person, 'id' | 'createdAt' | 'updatedAt'>): Promise<Person> {
-    if (!this.db || this.isWebPlatform) {
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) {
       throw new Error('Database not available');
     }
     const id = this.generateId();
     const now = this.getNow();
     const dbPerson = this.personToDb(person);
     
-    await this.db.runAsync(
+    await db.runAsync(
       `INSERT INTO persons (id, firstName, lastName, nickname, email, phone, avatar, birthday, relationship, tags, notes, companyId, lastInteraction, createdAt, updatedAt) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -112,7 +113,8 @@ export class PersonDAO extends BaseDAO<PersonDB> {
   }
 
   async update(id: string, person: Partial<Omit<Person, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Person | null> {
-    if (!this.db || this.isWebPlatform) return null;
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return null;
     const dbPerson = this.personToDb(person);
     const fields: string[] = [];
     const values: any[] = [];
@@ -133,7 +135,7 @@ export class PersonDAO extends BaseDAO<PersonDB> {
     values.push(this.getNow());
     values.push(id);
 
-    await this.db.runAsync(
+    await db.runAsync(
       `UPDATE persons SET ${fields.join(', ')} WHERE id = ?`,
       values
     );
@@ -142,8 +144,9 @@ export class PersonDAO extends BaseDAO<PersonDB> {
   }
 
   async getPersonById(id: string): Promise<Person | null> {
-    if (!this.db || this.isWebPlatform) return null;
-    const result = await this.db.getFirstAsync<PersonDB>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return null;
+    const result = await db.getFirstAsync<PersonDB>(
       `SELECT * FROM persons WHERE id = ?`,
       [id]
     );
@@ -151,25 +154,28 @@ export class PersonDAO extends BaseDAO<PersonDB> {
   }
 
   async getAllPersons(): Promise<Person[]> {
-    if (!this.db || this.isWebPlatform) return [];
-    const results = await this.db.getAllAsync<PersonDB>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return [];
+    const results = await db.getAllAsync<PersonDB>(
       `SELECT * FROM persons ORDER BY firstName, lastName`
     );
     return (results || []).map(r => this.dbToPerson(r));
   }
 
   async findByCompany(companyId: string): Promise<Person[]> {
-    if (!this.db || this.isWebPlatform) return [];
-    const results = await this.db.getAllAsync<PersonDB>(
-      `SELECT * FROM persons WHERE companyId = ? ORDER BY firstName, lastName`,
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return [];
+    const results = await db.getAllAsync<PersonDB>(
+      `SELECT * FROM persons WHERE companyId = ? ORDER by firstName, lastName`,
       [companyId]
     );
     return (results || []).map(r => this.dbToPerson(r));
   }
 
   async searchByName(query: string): Promise<Person[]> {
-    if (!this.db || this.isWebPlatform) return [];
-    const results = await this.db.getAllAsync<PersonDB>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return [];
+    const results = await db.getAllAsync<PersonDB>(
       `SELECT * FROM persons 
        WHERE firstName LIKE ? OR lastName LIKE ? OR nickname LIKE ?
        ORDER BY firstName, lastName`,
@@ -179,8 +185,9 @@ export class PersonDAO extends BaseDAO<PersonDB> {
   }
 
   async getUpcomingBirthdays(days: number = 30): Promise<Person[]> {
-    if (!this.db || this.isWebPlatform) return [];
-    const results = await this.db.getAllAsync<PersonDB>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return [];
+    const results = await db.getAllAsync<PersonDB>(
       `SELECT * FROM persons 
        WHERE birthday IS NOT NULL 
        AND strftime('%m-%d', birthday) >= strftime('%m-%d', 'now')
@@ -192,8 +199,9 @@ export class PersonDAO extends BaseDAO<PersonDB> {
   }
 
   async getRecentContacts(limit: number = 10): Promise<Person[]> {
-    if (!this.db || this.isWebPlatform) return [];
-    const results = await this.db.getAllAsync<PersonDB>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return [];
+    const results = await db.getAllAsync<PersonDB>(
       `SELECT * FROM persons 
        WHERE lastInteraction IS NOT NULL
        ORDER BY lastInteraction DESC
@@ -204,8 +212,9 @@ export class PersonDAO extends BaseDAO<PersonDB> {
   }
 
   async findByEmail(email: string): Promise<Person | null> {
-    if (!this.db || this.isWebPlatform) return null;
-    const result = await this.db.getFirstAsync<PersonDB>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return null;
+    const result = await db.getFirstAsync<PersonDB>(
       `SELECT * FROM persons WHERE email = ?`,
       [email]
     );

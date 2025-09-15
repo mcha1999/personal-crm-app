@@ -14,6 +14,13 @@ export abstract class BaseDAO<T> {
     this.db = this.database.getDb();
   }
 
+  protected ensureDatabase(): SQLite.SQLiteDatabase | null {
+    if (!this.db) {
+      this.db = this.database.getDb();
+    }
+    return this.db;
+  }
+
   protected generateId(): string {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
   }
@@ -40,16 +47,18 @@ export abstract class BaseDAO<T> {
   }
 
   async findAll(): Promise<T[]> {
-    if (!this.db || this.isWebPlatform) return [];
-    const result = await this.db.getAllAsync<T>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return [];
+    const result = await db.getAllAsync<T>(
       `SELECT * FROM ${this.tableName} ORDER BY createdAt DESC`
     );
     return result || [];
   }
 
   async findById(id: string): Promise<T | null> {
-    if (!this.db || this.isWebPlatform) return null;
-    const result = await this.db.getFirstAsync<T>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return null;
+    const result = await db.getFirstAsync<T>(
       `SELECT * FROM ${this.tableName} WHERE id = ?`,
       [id]
     );
@@ -57,8 +66,9 @@ export abstract class BaseDAO<T> {
   }
 
   async deleteById(id: string): Promise<boolean> {
-    if (!this.db || this.isWebPlatform) return false;
-    const result = await this.db.runAsync(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return false;
+    const result = await db.runAsync(
       `DELETE FROM ${this.tableName} WHERE id = ?`,
       [id]
     );
@@ -66,8 +76,9 @@ export abstract class BaseDAO<T> {
   }
 
   async count(): Promise<number> {
-    if (!this.db || this.isWebPlatform) return 0;
-    const result = await this.db.getFirstAsync<{ count: number }>(
+    const db = this.ensureDatabase();
+    if (!db || this.isWebPlatform) return 0;
+    const result = await db.getFirstAsync<{ count: number }>(
       `SELECT COUNT(*) as count FROM ${this.tableName}`
     );
     return result?.count || 0;

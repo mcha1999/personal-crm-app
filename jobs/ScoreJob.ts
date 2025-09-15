@@ -57,10 +57,18 @@ export class ScoreJob {
 
     try {
       const database = Database.getInstance();
-      if (!database.getDb()) {
-        throw new Error('Database not available');
+      
+      // Ensure database is initialized
+      if (!database.isAvailable()) {
+        console.log('[ScoreJob] Database not initialized, initializing now...');
+        await database.init();
+        
+        if (!database.isAvailable()) {
+          throw new Error('Database initialization failed');
+        }
       }
 
+      // Create DAOs after ensuring database is available
       const personDAO = new PersonDAO();
       const interactionDAO = new InteractionDAO();
       // const messageDAO = new MessageDAO();
