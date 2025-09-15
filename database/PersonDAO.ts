@@ -202,4 +202,13 @@ export class PersonDAO extends BaseDAO<PersonDB> {
     );
     return (results || []).map(r => this.dbToPerson(r));
   }
+
+  async findByEmail(email: string): Promise<Person | null> {
+    if (!this.db || this.isWebPlatform) return null;
+    const result = await this.db.getFirstAsync<PersonDB>(
+      `SELECT * FROM persons WHERE email = ?`,
+      [email]
+    );
+    return result ? this.dbToPerson(result) : null;
+  }
 }

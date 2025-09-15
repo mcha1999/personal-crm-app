@@ -113,4 +113,16 @@ export class InteractionDAO extends BaseDAO<InteractionDB> {
 
     return interaction;
   }
+
+  async findByPersonAndDate(personId: string, date: Date): Promise<Interaction | null> {
+    if (!this.db || this.isWebPlatform) return null;
+    const dateStr = date.toISOString().split('T')[0]; // Get date part only
+    const result = await this.db.getFirstAsync<InteractionDB>(
+      `SELECT * FROM interactions 
+       WHERE personId = ? AND date(date) = date(?)
+       ORDER BY date DESC LIMIT 1`,
+      [personId, dateStr]
+    );
+    return result ? this.dbToInteraction(result) : null;
+  }
 }

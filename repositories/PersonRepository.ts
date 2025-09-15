@@ -59,4 +59,22 @@ export class PersonRepository {
       return [];
     }
   }
+
+  async findByEmail(email: string): Promise<Person | null> {
+    try {
+      return await this.personDAO.findByEmail(email);
+    } catch (error) {
+      console.error('Failed to find person by email:', error);
+      return null;
+    }
+  }
+
+  async createPerson(personData: Omit<Person, 'id' | 'createdAt' | 'updatedAt'>): Promise<Person> {
+    try {
+      return await this.personDAO.create(personData);
+    } catch (error) {
+      console.error('Failed to create person:', error);
+      throw error;
+    }
+  }
 }
