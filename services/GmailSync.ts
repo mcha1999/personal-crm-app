@@ -58,7 +58,7 @@ export class GmailSync {
   // 3. Enable Gmail API
   // 4. Create OAuth 2.0 credentials (Web application type)
   // 5. Add redirect URIs: https://auth.expo.io/@your-username/your-app-slug
-  private readonly clientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+  private readonly clientId = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
   private redirectUri: string = '';
   private readonly scopes = [
     'https://www.googleapis.com/auth/gmail.readonly',
