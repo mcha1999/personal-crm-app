@@ -2,13 +2,19 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield, Upload, FileText, Users } from 'lucide-react-native';
+import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield, Upload, FileText, Users, Calendar as CalendarIcon } from 'lucide-react-native';
 import { BackgroundTaskManager } from '../services/BackgroundTaskManager';
 import { GoogleAPIService } from '../services/GoogleAPIService';
 import { LocalExport } from '../database/LocalExport';
 import { PRIVACY_CONFIG, PRIVACY_SCOPES, PRIVACY_GUARANTEES } from '../constants/privacy';
 import { useAuth } from '@/contexts/AuthContext';
 import { useContacts } from '@/contexts/ContactsContext';
+import { useDatabase } from '@/contexts/DatabaseContext';
+import { CalendarListener } from '../services/CalendarListener';
+import { PersonDAO } from '../database/PersonDAO';
+import { MeetingDAO } from '../database/MeetingDAO';
+import { PlaceDAO } from '../database/PlaceDAO';
+import { InteractionDAO } from '../database/InteractionDAO';
 import * as LocalAuthentication from 'expo-local-authentication';
 
 type SettingItem = 
@@ -29,9 +35,12 @@ export const SettingsScreen: React.FC = () => {
   const [nextSyncTime, setNextSyncTime] = React.useState<Date | null>(null);
   const [nextScoreTime, setNextScoreTime] = React.useState<Date | null>(null);
   const [supportedAuthTypes, setSupportedAuthTypes] = React.useState<LocalAuthentication.AuthenticationType[]>([]);
+  const [isCalendarImporting, setIsCalendarImporting] = React.useState(false);
+  const [lastCalendarImport, setLastCalendarImport] = React.useState<Date | null>(null);
   
   const { isAuthEnabled, enableAuth, disableAuth, getSupportedAuthTypes } = useAuth();
   const { isImporting, lastImportResult, lastImportDate, error: contactsError, importContacts, clearError } = useContacts();
+  const { database, isInitialized } = useDatabase();
 
   useEffect(() => {
     const taskManager = BackgroundTaskManager.getInstance();
@@ -204,6 +213,56 @@ export const SettingsScreen: React.FC = () => {
     }
   };
 
+  const handleImportCalendar = async () => {
+    if (isCalendarImporting || !isInitialized) return;
+    
+    try {
+      setIsCalendarImporting(true);
+      
+      // Create DAO instances
+      const personDAO = new PersonDAO();
+      const meetingDAO = new MeetingDAO();
+      const placeDAO = new PlaceDAO();
+      const interactionDAO = new InteractionDAO();
+      
+      // Initialize DAOs with database
+      personDAO.setDatabase(database.getDb());
+      meetingDAO.setDatabase(database.getDb());
+      placeDAO.setDatabase(database.getDb());
+      interactionDAO.setDatabase(database.getDb());
+      
+      const calendarListener = CalendarListener.getInstance(
+        personDAO,
+        meetingDAO,
+        placeDAO,
+        interactionDAO
+      );
+      
+      // Check permissions first
+      const hasPermission = await calendarListener.requestPermissions();
+      if (!hasPermission) {
+        Alert.alert('Permission Required', 'Calendar permission is required to import events.');
+        return;
+      }
+      
+      // Run manual sync with 180 days past, 60 days future
+      await calendarListener.runManualSync({ pastDays: 180, futureDays: 60 });
+      
+      setLastCalendarImport(new Date());
+      Alert.alert(
+        'Calendar Import Complete',
+        'Calendar events have been imported successfully. Meetings and interactions have been created.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Calendar import error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to import calendar';
+      Alert.alert('Import Failed', message);
+    } finally {
+      setIsCalendarImporting(false);
+    }
+  };
+
   const getContactsImportSubtitle = (): string => {
     if (isImporting) return 'Importing contacts...';
     if (contactsError) return `Error: ${contactsError}`;
@@ -213,6 +272,16 @@ export const SettingsScreen: React.FC = () => {
       return `Last: ${lastImportResult.imported + lastImportResult.updated} contacts (${timeStr})`;
     }
     return 'Import contacts from device';
+  };
+
+  const getCalendarImportSubtitle = (): string => {
+    if (isCalendarImporting) return 'Importing calendar events...';
+    if (lastCalendarImport) {
+      const timeAgo = Math.floor((Date.now() - lastCalendarImport.getTime()) / (1000 * 60));
+      const timeStr = timeAgo < 60 ? `${timeAgo}m ago` : `${Math.floor(timeAgo / 60)}h ago`;
+      return `Last import: ${timeStr}`;
+    }
+    return 'Import events from calendar (180 days past, 60 days future)';
   };
 
   const handleAuthToggle = async (enabled: boolean) => {
@@ -306,6 +375,13 @@ export const SettingsScreen: React.FC = () => {
           subtitle: getContactsImportSubtitle(),
           type: 'action',
           onPress: handleImportContacts,
+        },
+        {
+          icon: <CalendarIcon size={20} color={isCalendarImporting ? "#F39C12" : "#3498DB"} />,
+          label: 'Import calendar now',
+          subtitle: getCalendarImportSubtitle(),
+          type: 'action',
+          onPress: handleImportCalendar,
         },
       ],
     },
