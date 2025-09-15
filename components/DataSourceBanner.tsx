@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { AlertCircle, ChevronRight } from 'lucide-react-native';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 
 export const DataSourceBanner: React.FC = () => {
+  const router = useRouter();
   const { steps } = useOnboarding();
   
   // Check which data sources are disabled

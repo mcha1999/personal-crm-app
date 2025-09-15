@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { DatabaseProvider, useDatabase } from "@/contexts/DatabaseContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ContactsContext } from "@/contexts/ContactsContext";
+import { OnboardingProvider } from "@/contexts/OnboardingContext";
 import { AuthScreen } from "@/components/AuthScreen";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { BackgroundTaskManager } from "@/services/BackgroundTaskManager";
@@ -77,11 +78,13 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <DatabaseProvider>
-          <ContactsContext>
-            <GestureHandlerRootView style={styles.rootView}>
-              <AppContent />
-            </GestureHandlerRootView>
-          </ContactsContext>
+          <OnboardingProvider>
+            <ContactsContext>
+              <GestureHandlerRootView style={styles.rootView}>
+                <AppContent />
+              </GestureHandlerRootView>
+            </ContactsContext>
+          </OnboardingProvider>
         </DatabaseProvider>
       </AuthProvider>
     </QueryClientProvider>
