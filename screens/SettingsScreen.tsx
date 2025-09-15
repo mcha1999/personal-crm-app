@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield, Upload, FileText, Users, Calendar as CalendarIcon, Mail, Calculator, Cpu } from 'lucide-react-native';
 import { BackgroundTaskManager } from '../services/BackgroundTaskManager';
@@ -32,6 +32,7 @@ type SettingSection = {
 };
 
 export const SettingsScreen: React.FC = () => {
+  const router = useRouter();
   const [notifications, setNotifications] = React.useState(true);
   const [reminders, setReminders] = React.useState(true);
   const [googleAPIEnabled, setGoogleAPIEnabled] = React.useState(false);
