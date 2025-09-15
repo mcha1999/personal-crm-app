@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { AlertCircle, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { theme } from '@/constants/theme';
 
 export const DataSourceBanner: React.FC = () => {
   const router = useRouter();
@@ -43,26 +44,26 @@ export const DataSourceBanner: React.FC = () => {
       activeOpacity={0.8}
     >
       <View style={styles.content}>
-        <AlertCircle size={18} color="#FF9500" />
+        <AlertCircle size={18} color={theme.colors.warning} />
         <Text style={styles.message}>{getMessage()}</Text>
       </View>
-      <ChevronRight size={18} color="#FF9500" />
+      <ChevronRight size={18} color={theme.colors.warning} />
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: '#FFF5E6',
-    borderRadius: 12,
-    padding: 12,
-    marginHorizontal: 16,
-    marginBottom: 16,
+    backgroundColor: theme.colors.warningBackground,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#FFE0B2',
+    borderColor: theme.colors.warningBorder,
   },
   content: {
     flexDirection: 'row',
@@ -70,10 +71,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   message: {
-    fontSize: 14,
-    color: '#FF9500',
-    fontWeight: '500',
-    marginLeft: 8,
+    ...theme.typography.footnote,
+    color: theme.colors.warning,
+    fontWeight: '500' as const,
+    marginLeft: theme.spacing.sm,
     flex: 1,
   },
 });

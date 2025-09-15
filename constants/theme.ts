@@ -15,6 +15,8 @@ export const theme = {
     error: '#EF4444',
     success: '#10B981',
     warning: '#F59E0B',
+    warningBackground: '#FFF5E6',
+    warningBorder: '#FFE0B2',
     gradientStart: '#6366F1',
     gradientEnd: '#EC4899',
   },
