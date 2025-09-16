@@ -14,10 +14,12 @@ export class ThreadDAO extends BaseDAO<Thread> {
     super('threads');
   }
 
-  private mapRowToThread(row: ThreadRow): Thread {
+  private async mapRowToThread(row: ThreadRow): Promise<Thread> {
+    const participants = await this.getParticipants(row.id);
     return {
       id: row.id,
-      personIds: [],
+      personIds: participants,
+      subject: row.subject,
       lastMessageAt: new Date(row.lastMessageAt),
       platform: 'other' as const,
       unreadCount: 0,
@@ -31,7 +33,11 @@ export class ThreadDAO extends BaseDAO<Thread> {
     const rows = await this.db.getAllAsync<ThreadRow>(
       `SELECT * FROM ${this.tableName} ORDER BY lastMessageAt DESC`
     );
-    return rows.map(row => this.mapRowToThread(row));
+    const threads: Thread[] = [];
+    for (const row of rows) {
+      threads.push(await this.mapRowToThread(row));
+    }
+    return threads;
   }
 
   async findById(id: string): Promise<Thread | null> {
@@ -40,7 +46,7 @@ export class ThreadDAO extends BaseDAO<Thread> {
       `SELECT * FROM ${this.tableName} WHERE id = ?`,
       [id]
     );
-    return row ? this.mapRowToThread(row) : null;
+    return row ? await this.mapRowToThread(row) : null;
   }
 
   async findByParticipant(personId: string): Promise<Thread[]> {
@@ -52,7 +58,11 @@ export class ThreadDAO extends BaseDAO<Thread> {
        ORDER BY t.lastMessageAt DESC`,
       [personId]
     );
-    return rows.map(row => this.mapRowToThread(row));
+    const threads: Thread[] = [];
+    for (const row of rows) {
+      threads.push(await this.mapRowToThread(row));
+    }
+    return threads;
   }
 
   async create(thread: Omit<Thread, 'id' | 'createdAt' | 'updatedAt'>): Promise<Thread> {
@@ -68,7 +78,7 @@ export class ThreadDAO extends BaseDAO<Thread> {
        VALUES (?, ?, ?, ?, ?)`,
       [
         id,
-        'Thread',
+        thread.subject || 'Thread',
         thread.lastMessageAt.toISOString(),
         now,
         now
@@ -78,6 +88,7 @@ export class ThreadDAO extends BaseDAO<Thread> {
     return {
       ...thread,
       id,
+      subject: thread.subject || 'Thread',
       createdAt: new Date(now),
       updatedAt: new Date(now),
     };
@@ -96,7 +107,7 @@ export class ThreadDAO extends BaseDAO<Thread> {
        SET subject = ?, lastMessageAt = ?, updatedAt = ?
        WHERE id = ?`,
       [
-        'Thread',
+        updates.subject ?? existing.subject ?? 'Thread',
         (updates.lastMessageAt ?? existing.lastMessageAt).toISOString(),
         now,
         id
