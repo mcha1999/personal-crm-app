@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Lock, Palette, HelpCircle, Info, LogOut, ChevronRight, RefreshCw, Brain, Download, Camera, MapPin, Shield, Upload, FileText, Users, Calendar as CalendarIcon, Mail, Calculator, Cpu } from 'lucide-react-native';
 import { BackgroundTaskManager } from '../services/BackgroundTaskManager';
@@ -26,6 +26,7 @@ import { PersonDAO } from '../database/PersonDAO';
 import { MeetingDAO } from '../database/MeetingDAO';
 import { PlaceDAO } from '../database/PlaceDAO';
 import { InteractionDAO } from '../database/InteractionDAO';
+import { ImapService, EmailAccountConfig } from '@/services/ImapService';
 
 import { ScoreJob } from '../jobs/ScoreJob';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -42,6 +43,7 @@ type SettingSection = {
 
 export const SettingsScreen: React.FC = () => {
   const router = useRouter();
+  const imapService = React.useMemo(() => ImapService.getInstance(), []);
   const [notifications, setNotifications] = React.useState(true);
   const [reminders, setReminders] = React.useState(true);
   const [googleAPIEnabled, setGoogleAPIEnabled] = React.useState(false);
@@ -50,6 +52,10 @@ export const SettingsScreen: React.FC = () => {
   const [supportedAuthTypes, setSupportedAuthTypes] = React.useState<LocalAuthentication.AuthenticationType[]>([]);
   const [isCalendarImporting, setIsCalendarImporting] = React.useState(false);
   const [lastCalendarImport, setLastCalendarImport] = React.useState<Date | null>(null);
+
+  const [imapConfig, setImapConfig] = React.useState<EmailAccountConfig | null>(null);
+  const [isImapSyncing, setIsImapSyncing] = React.useState(false);
+  const [lastImapSync, setLastImapSync] = React.useState<Date | null>(null);
 
   const [healthTapCount, setHealthTapCount] = React.useState(0);
   
@@ -102,13 +108,20 @@ export const SettingsScreen: React.FC = () => {
     
     checkGoogleAuth();
     checkAuthTypes();
+    refreshImapStatus();
 
     const interval = setInterval(() => {
       loadTaskStatus();
     }, 60000);
 
     return () => clearInterval(interval);
-  }, [getSupportedAuthTypes]);
+  }, [getSupportedAuthTypes, refreshImapStatus]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshImapStatus();
+    }, [refreshImapStatus])
+  );
 
   const formatNextRunTime = (date: Date | null): string => {
     if (!date) return 'Not scheduled';
@@ -379,7 +392,7 @@ export const SettingsScreen: React.FC = () => {
 
   const handleImportCalendar = async () => {
     if (isCalendarImporting || !isInitialized) return;
-    
+
     try {
       setIsCalendarImporting(true);
       
@@ -421,6 +434,40 @@ export const SettingsScreen: React.FC = () => {
     }
   };
 
+  const handleManualImapSync = async () => {
+    if (isImapSyncing) return;
+
+    const config = await imapService.getConfig();
+    if (!config) {
+      Alert.alert('Email Not Linked', 'Link an IMAP account to enable syncing.');
+      return;
+    }
+
+    setIsImapSyncing(true);
+
+    try {
+      const result = await imapService.syncMailbox({ limit: 25 });
+
+      if (result.success) {
+        const parts = [] as string[];
+        parts.push(`${result.messagesProcessed} email${result.messagesProcessed === 1 ? '' : 's'} processed`);
+        if (result.contactsCreated > 0) {
+          parts.push(`${result.contactsCreated} contact${result.contactsCreated === 1 ? '' : 's'} updated`);
+        }
+
+        Alert.alert('Email Synced', `IMAP sync complete (${parts.join(', ')}).`);
+      } else {
+        Alert.alert('Sync Failed', result.error ?? 'Unable to sync emails.');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to sync emails.';
+      Alert.alert('Sync Failed', message);
+    } finally {
+      setIsImapSyncing(false);
+      await refreshImapStatus();
+    }
+  };
+
   const getContactsImportSubtitle = (): string => {
     if (isImporting) return 'Importing contacts...';
     if (contactsError) return `Error: ${contactsError}`;
@@ -441,6 +488,22 @@ export const SettingsScreen: React.FC = () => {
     }
     return 'Import events from calendar (180 days past, 60 days future)';
   };
+
+  const refreshImapStatus = React.useCallback(async () => {
+    try {
+      const config = await imapService.getConfig();
+      setImapConfig(config);
+
+      if (config) {
+        const lastSyncDate = await imapService.getLastSyncTime();
+        setLastImapSync(lastSyncDate ?? null);
+      } else {
+        setLastImapSync(null);
+      }
+    } catch (error) {
+      console.warn('[SettingsScreen] Failed to refresh IMAP status:', error);
+    }
+  }, [imapService]);
 
 
 
@@ -525,10 +588,18 @@ export const SettingsScreen: React.FC = () => {
         {
           icon: <Mail size={20} color="#007AFF" />,
           label: 'Link Email Account (IMAP)',
-          subtitle: 'Add Gmail, Outlook, iCloud, or custom IMAP',
+          subtitle: imapConfig ? `Connected: ${imapConfig.email}` : 'Add Gmail, Outlook, iCloud, or custom IMAP',
           type: 'action' as const,
           onPress: () => router.push('/email-setup'),
         },
+        ...(imapConfig ? [{
+          icon: <RefreshCw size={20} color={isImapSyncing ? "#F39C12" : "#007AFF"} />,
+          label: 'Sync Email Now',
+          subtitle: lastImapSync ? `Last sync: ${formatLastRunTime(lastImapSync)}` : 'Pull the latest emails via IMAP',
+          type: 'action' as const,
+          onPress: handleManualImapSync,
+          loading: isImapSyncing,
+        }] : []),
       ],
     },
     {
