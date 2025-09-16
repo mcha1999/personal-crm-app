@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,10 @@ import {
   Switch,
   Alert,
   SafeAreaView,
-  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Mail, Server, Lock, HelpCircle, X } from 'lucide-react-native';
+import { ImapService, EmailAccountConfig } from '@/services/ImapService';
 
 interface EmailProvider {
   name: string;
@@ -33,6 +31,8 @@ const EMAIL_PROVIDERS: EmailProvider[] = [
 ];
 
 export default function EmailAccountSetupScreen() {
+  const imapService = useMemo(() => ImapService.getInstance(), []);
+  const syncSupported = useMemo(() => imapService.isSyncSupported(), [imapService]);
   const [selectedProvider, setSelectedProvider] = useState<EmailProvider | null>(null);
   const [email, setEmail] = useState<string>('');
   const [appPassword, setAppPassword] = useState<string>('');
@@ -40,6 +40,7 @@ export default function EmailAccountSetupScreen() {
   const [port, setPort] = useState<string>('993');
   const [tls, setTls] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isTesting, setIsTesting] = useState<boolean>(false);
 
   const handleProviderSelect = (provider: EmailProvider) => {
     setSelectedProvider(provider);
@@ -48,38 +49,96 @@ export default function EmailAccountSetupScreen() {
     setTls(provider.tls);
   };
 
+  const prepareConfig = (): { config: EmailAccountConfig | null; error?: string } => {
+    if (!selectedProvider) {
+      return { config: null, error: 'Please choose your email provider.' };
+    }
+
+    if (!email.trim() || !appPassword.trim() || !host.trim() || !port.trim()) {
+      return { config: null, error: 'Please fill in all required fields.' };
+    }
+
+    const parsedPort = parseInt(port.trim(), 10);
+    if (Number.isNaN(parsedPort) || parsedPort <= 0) {
+      return { config: null, error: 'Please enter a valid IMAP port number.' };
+    }
+
+    return {
+      config: {
+        email: email.trim(),
+        appPassword: appPassword.trim(),
+        host: host.trim(),
+        port: parsedPort,
+        tls,
+        provider: selectedProvider?.name || 'Custom',
+        createdAt: new Date().toISOString(),
+      },
+    };
+  };
+
+  const handleTestConnection = async () => {
+    const { config, error } = prepareConfig();
+    if (!config) {
+      Alert.alert('Missing Information', error || 'Please complete the form before testing.');
+      return;
+    }
+
+    setIsTesting(true);
+    try {
+      await imapService.testConnection(config);
+      Alert.alert('Connection Successful', `Successfully connected to ${config.provider} via IMAP.`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to connect to the IMAP server. Please check your details.';
+      Alert.alert('Connection Failed', message);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   const handleSave = async () => {
-    if (!email || !appPassword || !host || !port) {
-      Alert.alert('Missing Information', 'Please fill in all required fields.');
+    const { config, error } = prepareConfig();
+    if (!config) {
+      Alert.alert('Missing Information', error || 'Please fill in all required fields.');
       return;
     }
 
     setIsLoading(true);
     try {
-      const emailConfig = {
-        email,
-        appPassword,
-        host,
-        port: parseInt(port),
-        tls,
-        provider: selectedProvider?.name || 'Custom',
-        createdAt: new Date().toISOString(),
-      };
+      await imapService.saveConfig(config);
 
-      if (Platform.OS !== 'web') {
-        await SecureStore.setItemAsync('email_config', JSON.stringify(emailConfig));
-      } else {
-        await AsyncStorage.setItem('email_config', JSON.stringify(emailConfig));
+      if (!imapService.isSyncSupported()) {
+        Alert.alert(
+          'Account Saved',
+          'Your IMAP settings were stored securely. This build cannot connect directly to IMAP servers, so email syncing will remain unavailable until a native build with TCP support is installed.',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+        return;
       }
-      
-      Alert.alert(
-        'Account Saved',
-        'Account saved locally. IMAP sync will run in background.',
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
-    } catch (error) {
-      console.error('Failed to save email config:', error);
-      Alert.alert('Error', 'Failed to save email configuration. Please try again.');
+
+      const syncResult = await imapService.syncMailbox({ limit: 25 });
+
+      if (syncResult.success) {
+        const detailParts = [] as string[];
+        detailParts.push(`${syncResult.messagesProcessed} email${syncResult.messagesProcessed === 1 ? '' : 's'} processed`);
+        if (syncResult.contactsCreated > 0) {
+          detailParts.push(`${syncResult.contactsCreated} contact${syncResult.contactsCreated === 1 ? '' : 's'} updated`);
+        }
+
+        Alert.alert(
+          'Account Linked',
+          `Account saved and initial sync complete (${detailParts.join(', ')}).`,
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+      } else {
+        Alert.alert(
+          'Account Linked',
+          `Account saved, but email sync could not complete (${syncResult.error ?? 'Unknown error'}).`,
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save email configuration. Please try again.';
+      Alert.alert('Error', message);
     } finally {
       setIsLoading(false);
     }
@@ -125,6 +184,15 @@ export default function EmailAccountSetupScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {!syncSupported && (
+          <View style={styles.noticeCard}>
+            <Text style={styles.noticeTitle}>IMAP sync unavailable</Text>
+            <Text style={styles.noticeText}>
+              This preview build cannot open raw TCP connections. Your configuration will be saved for future native builds, but emails will not sync automatically yet. We recommend using the Gmail integration for live email syncing.
+            </Text>
+          </View>
+        )}
 
         {selectedProvider && (
           <View style={styles.formContainer}>
@@ -211,17 +279,25 @@ export default function EmailAccountSetupScreen() {
       {selectedProvider && (
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.button, styles.testButton]}
-            disabled
+            style={[
+              styles.button,
+              styles.testButton,
+              (isTesting || isLoading) && styles.disabledButton,
+            ]}
+            onPress={handleTestConnection}
+            disabled={isTesting || isLoading}
+            activeOpacity={0.7}
           >
-            <Text style={styles.testButtonText}>Test Connection</Text>
-            <Text style={styles.comingSoonText}>(Coming Soon)</Text>
+            <Text style={styles.testButtonText}>
+              {isTesting ? 'Testing connection…' : 'Test Connection'}
+            </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
-            style={[styles.button, styles.saveButton]}
+            style={[styles.button, styles.saveButton, (isLoading || isTesting) && styles.disabledButton]}
             onPress={handleSave}
-            disabled={isLoading}
+            disabled={isLoading || isTesting}
+            activeOpacity={0.7}
           >
             <Text style={styles.saveButtonText}>
               {isLoading ? 'Saving...' : 'Save Account'}
@@ -304,6 +380,25 @@ const styles = StyleSheet.create({
     color: '#666666',
     textAlign: 'center',
   },
+  noticeCard: {
+    marginTop: 24,
+    backgroundColor: '#FFF5E6',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F5C16C',
+  },
+  noticeTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#C27B23',
+    marginBottom: 8,
+  },
+  noticeText: {
+    fontSize: 14,
+    color: '#8A6D3B',
+    lineHeight: 20,
+  },
   formContainer: {
     marginTop: 8,
   },
@@ -377,17 +472,15 @@ const styles = StyleSheet.create({
   testButton: {
     backgroundColor: '#F5F5F5',
     borderWidth: 1,
-    borderColor: '#E5E5E7',
+    borderColor: '#C7D7FF',
   },
   testButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#999999',
+    color: '#007AFF',
   },
-  comingSoonText: {
-    fontSize: 12,
-    color: '#999999',
-    marginTop: 2,
+  disabledButton: {
+    opacity: 0.6,
   },
   saveButton: {
     backgroundColor: '#007AFF',
