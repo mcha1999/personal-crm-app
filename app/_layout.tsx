@@ -25,7 +25,6 @@ function RootLayoutNav() {
       <Stack.Screen name="health" options={{ presentation: "modal", title: "Health Check" }} />
       <Stack.Screen name="ai-demo" options={{ presentation: "modal", title: "AI Demo" }} />
       <Stack.Screen name="email-setup" options={{ presentation: "modal", title: "Email Setup" }} />
-
     </Stack>
   );
 }

@@ -43,7 +43,7 @@ export default function EmailComposeScreen() {
           setTo(loadedPerson.email || '');
           
           // Get last interaction for context
-          const interactions = await interactionDAO.getByPersonId(personId);
+          const interactions = await interactionDAO.getByPerson(personId);
           const lastInteraction = interactions[0];
           
           // Suggest follow-up email
