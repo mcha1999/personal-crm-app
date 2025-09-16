@@ -31,8 +31,6 @@ export function ManualEmailLogger() {
       return;
     }
 
-
-
     setIsLogging(true);
     try {
       const entry: ManualEmailEntry = {

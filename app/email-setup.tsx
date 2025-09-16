@@ -9,9 +9,11 @@ import {
   Switch,
   Alert,
   SafeAreaView,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Mail, Server, Lock, HelpCircle, X } from 'lucide-react-native';
 
 interface EmailProvider {
@@ -64,7 +66,11 @@ export default function EmailAccountSetupScreen() {
         createdAt: new Date().toISOString(),
       };
 
-      await SecureStore.setItemAsync('email_config', JSON.stringify(emailConfig));
+      if (Platform.OS !== 'web') {
+        await SecureStore.setItemAsync('email_config', JSON.stringify(emailConfig));
+      } else {
+        await AsyncStorage.setItem('email_config', JSON.stringify(emailConfig));
+      }
       
       Alert.alert(
         'Account Saved',
