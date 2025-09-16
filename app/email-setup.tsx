@@ -15,6 +15,7 @@ import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Mail, Server, Lock, HelpCircle, X } from 'lucide-react-native';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 
 interface EmailProvider {
   name: string;
@@ -40,6 +41,7 @@ export default function EmailAccountSetupScreen() {
   const [port, setPort] = useState<string>('993');
   const [tls, setTls] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const { setEmailMethod } = useOnboarding();
 
   const handleProviderSelect = (provider: EmailProvider) => {
     setSelectedProvider(provider);
@@ -71,7 +73,9 @@ export default function EmailAccountSetupScreen() {
       } else {
         await AsyncStorage.setItem('email_config', JSON.stringify(emailConfig));
       }
-      
+
+      await setEmailMethod('imap');
+
       Alert.alert(
         'Account Saved',
         'Account saved locally. IMAP sync will run in background.',
