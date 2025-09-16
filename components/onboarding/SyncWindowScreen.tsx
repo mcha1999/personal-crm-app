@@ -10,10 +10,10 @@ import { Clock, CheckCircle } from 'lucide-react-native';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 
 const SYNC_OPTIONS = [
-  { days: 7, label: '1 Week', description: 'Recent interactions only' },
-  { days: 30, label: '1 Month', description: 'Recommended for most users' },
-  { days: 90, label: '3 Months', description: 'Comprehensive history' },
-  { days: 365, label: '1 Year', description: 'Full annual view' },
+  { days: 7, label: '1 Week', description: 'Fastest sync — perfect for a quick preview.' },
+  { days: 30, label: '1 Month', description: 'Recommended balance of speed and context.' },
+  { days: 90, label: '3 Months', description: 'Great for active pipelines and follow-ups.' },
+  { days: 365, label: '1 Year', description: 'Bring in a full annual relationship history.' },
 ];
 
 export function SyncWindowScreen() {
@@ -41,9 +41,9 @@ export function SyncWindowScreen() {
           </View>
           <Text style={styles.title}>Sync Window</Text>
           <Text style={styles.subtitle}>
-            {isCompleted 
+            {isCompleted
               ? `Set to sync ${selectedDays} days of data`
-              : 'Choose how much historical data to sync initially'
+              : 'Choose how much history Kin should import on day one.'
             }
           </Text>
         </View>
@@ -77,42 +77,34 @@ export function SyncWindowScreen() {
         )}
 
         <View style={styles.explanation}>
-          <Text style={styles.explanationTitle}>Why This Matters</Text>
+          <Text style={styles.explanationTitle}>Why this matters</Text>
           <Text style={styles.explanationText}>
-            The sync window determines how far back Kin will look when importing 
-            your data. You can always adjust this later in Settings.
+            The sync window tells Kin how far back to look when pulling emails, meetings, and contacts into your local database. You can expand or shrink it later from Settings → Sync &amp; Data.
           </Text>
-          
+
           <View style={styles.bulletPoint}>
             <Text style={styles.bullet}>•</Text>
-            <Text style={styles.bulletText}>Shorter windows sync faster</Text>
+            <Text style={styles.bulletText}>Shorter windows sync faster and are ideal for a quick start.</Text>
           </View>
           <View style={styles.bulletPoint}>
             <Text style={styles.bullet}>•</Text>
-            <Text style={styles.bulletText}>Longer windows provide more context</Text>
+            <Text style={styles.bulletText}>Longer windows provide richer relationship context for insights.</Text>
           </View>
           <View style={styles.bulletPoint}>
             <Text style={styles.bullet}>•</Text>
-            <Text style={styles.bulletText}>All data stays on your device</Text>
+            <Text style={styles.bulletText}>All imports stay on this device — nothing is uploaded.</Text>
           </View>
         </View>
 
         <View style={styles.performanceNote}>
           <Text style={styles.performanceTitle}>Performance Note</Text>
           <Text style={styles.performanceText}>
-            Initial sync time varies based on your data volume. Larger sync 
-            windows may take several minutes to complete.
+            Initial sync time varies based on your data volume. Larger windows may take several minutes; we’ll show progress as Kin imports.
           </Text>
         </View>
       </View>
 
-      <View style={styles.footer}>
-        {isCompleted && (
-          <TouchableOpacity style={styles.primaryButton} onPress={() => {}}>
-            <Text style={styles.primaryButtonText}>Continue</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <View style={styles.footer} />
     </SafeAreaView>
   );
 }
@@ -262,16 +254,5 @@ const styles = StyleSheet.create({
   footer: {
     padding: 24,
     paddingBottom: 32,
-  },
-  primaryButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

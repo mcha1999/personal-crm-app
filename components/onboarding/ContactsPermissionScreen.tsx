@@ -47,32 +47,30 @@ export function ContactsPermissionScreen() {
           </View>
           <Text style={styles.title}>Contacts Access</Text>
           <Text style={styles.subtitle}>
-            {isCompleted 
-              ? 'Great! We can now track your relationships'
-              : 'Help Kin understand your network by accessing your contacts'
+            {isCompleted
+              ? 'Contacts connected — Kin will match people automatically.'
+              : 'Let Kin link the people in your network across email, calendar, and notes.'
             }
           </Text>
         </View>
 
         <View style={styles.explanation}>
-          <Text style={styles.explanationTitle}>Why we need this</Text>
+          <Text style={styles.explanationTitle}>Why we ask</Text>
           <Text style={styles.explanationText}>
-            Kin uses your contacts to identify people in your meetings and emails. 
-            This helps build a comprehensive view of your professional relationships 
-            and interaction patterns.
+            Kin uses contact names, email addresses, and photos to recognize the people in your meetings and logged emails. Data stays on your device and you can turn access off later in Settings.
           </Text>
-          
+
           <View style={styles.bulletPoint}>
             <Text style={styles.bullet}>•</Text>
-            <Text style={styles.bulletText}>Match email addresses to contact names</Text>
+            <Text style={styles.bulletText}>Fill in names, avatars, and job titles automatically</Text>
           </View>
           <View style={styles.bulletPoint}>
             <Text style={styles.bullet}>•</Text>
-            <Text style={styles.bulletText}>Identify meeting participants</Text>
+            <Text style={styles.bulletText}>Identify meeting participants across all of your calendars</Text>
           </View>
           <View style={styles.bulletPoint}>
             <Text style={styles.bullet}>•</Text>
-            <Text style={styles.bulletText}>Track relationship strength over time</Text>
+            <Text style={styles.bulletText}>Track relationship history without creating duplicates</Text>
           </View>
         </View>
 
@@ -94,8 +92,8 @@ export function ContactsPermissionScreen() {
       <View style={styles.footer}>
         {!isCompleted && (
           <>
-            <TouchableOpacity 
-              style={[styles.primaryButton, isRequesting && styles.buttonDisabled]} 
+            <TouchableOpacity
+              style={[styles.primaryButton, isRequesting && styles.buttonDisabled]}
               onPress={handleRequestPermission}
               disabled={isRequesting}
             >
@@ -105,21 +103,15 @@ export function ContactsPermissionScreen() {
                 <Text style={styles.primaryButtonText}>Allow Access</Text>
               )}
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.secondaryButton} 
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
               onPress={handleSkip}
               disabled={isRequesting}
             >
               <Text style={styles.secondaryButtonText}>Skip for Now</Text>
             </TouchableOpacity>
           </>
-        )}
-        
-        {isCompleted && (
-          <TouchableOpacity style={styles.primaryButton} onPress={() => {}}>
-            <Text style={styles.primaryButtonText}>Continue</Text>
-          </TouchableOpacity>
         )}
       </View>
     </SafeAreaView>

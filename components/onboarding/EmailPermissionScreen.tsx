@@ -22,25 +22,25 @@ export function EmailPermissionScreen() {
     {
       id: 'imap',
       title: 'IMAP Connection',
-      description: 'Connect your email account using App Passwords',
+      description: 'Connect your inbox securely with App Passwords.',
       icon: Server,
-      details: 'Secure on-device email analysis using IMAP with App Passwords for Gmail, Outlook, iCloud',
+      details: 'Kin stores credentials in SecureStore and processes email headers locally. Works with Gmail, Outlook, iCloud, Yahoo, and more.',
       recommended: true,
       hasSetup: true,
     },
     {
       id: 'manual',
       title: 'Manual Logging',
-      description: 'Manually log important email interactions',
+      description: 'Manually log important email interactions.',
       icon: Mail,
-      details: 'Quick and private - log emails when they matter for relationship tracking',
+      details: 'Perfect if you want to start private and only log key messages when they matter.',
     },
     {
       id: 'shortcuts',
       title: 'iOS Shortcuts Integration',
-      description: 'Use iOS Shortcuts to extract email data',
+      description: 'Use iOS Shortcuts to extract email data automatically.',
       icon: Zap,
-      details: 'Set up shortcuts to automatically capture email metadata on-device',
+      details: 'Set up custom automations to capture email metadata on-device (templates coming soon).',
       comingSoon: true,
     },
   ];
@@ -78,26 +78,26 @@ export function EmailPermissionScreen() {
           </View>
           <Text style={styles.title}>Email Intelligence</Text>
           <Text style={styles.subtitle}>
-            {isCompleted 
+            {isCompleted
               ? 'Email tracking configured!'
-              : 'Choose how to track email interactions with your contacts'
+              : 'Decide how Kin should learn from your email interactions.'
             }
           </Text>
         </View>
 
         <View style={styles.explanation}>
-          <Text style={styles.explanationTitle}>On-Device Email Intelligence</Text>
+          <Text style={styles.explanationTitle}>On-device email intelligence</Text>
           <Text style={styles.explanationText}>
-            Connect your email account using secure App Passwords for on-device analysis. All processing happens locally using Apple Intelligence and local ML - no data leaves your device.
+            Connect with secure App Passwords to let Kin analyze headers and metadata locally. Everything is processed on this device and saved to encrypted SQLite.
           </Text>
         </View>
 
         <View style={styles.privacyCard}>
           <CheckCircle size={20} color="#34C759" />
           <View style={styles.privacyContent}>
-            <Text style={styles.privacyTitle}>Secure App Password Authentication</Text>
+            <Text style={styles.privacyTitle}>Credentials stay in SecureStore</Text>
             <Text style={styles.privacyText}>
-              Use App Passwords (not your main password) to securely connect Gmail, Outlook, iCloud, or any IMAP provider. All email analysis happens on your device.
+              IMAP settings and tokens are stored with SecureStore. Remove Kin and the credentials disappear with it.
             </Text>
           </View>
         </View>
@@ -189,20 +189,15 @@ export function EmailPermissionScreen() {
               </TouchableOpacity>
             )}
             
-            <TouchableOpacity 
-              style={styles.secondaryButton} 
+            <TouchableOpacity
+              style={styles.secondaryButton}
               onPress={handleSkip}
             >
-              <Text style={styles.secondaryButtonText}>Skip for now</Text>
+              <Text style={styles.secondaryButtonText}>Skip for now (configure later)</Text>
             </TouchableOpacity>
           </>
         )}
         
-        {isCompleted && (
-          <TouchableOpacity style={styles.primaryButton} onPress={() => {}}>
-            <Text style={styles.primaryButtonText}>Continue</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </SafeAreaView>
   );

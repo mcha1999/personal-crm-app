@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,27 @@ export function CalendarPermissionScreen() {
   const { requestCalendarPermission, steps, completeStep } = useOnboarding();
   const [isRequesting, setIsRequesting] = useState(false);
   const [selectedSource, setSelectedSource] = useState<'eventkit' | 'google' | null>(null);
+
+  const calendarOptions = useMemo(() => ([
+    {
+      id: 'eventkit' as const,
+      title: 'Device Calendar',
+      description: "Works with the native calendar app on this device (iOS or Android).",
+      icon: Smartphone,
+      disabled: Platform.OS === 'web' || isRequesting,
+      note: Platform.OS === 'web' ? 'Not available on web' : 'Recommended',
+      comingSoon: false,
+    },
+    {
+      id: 'google' as const,
+      title: 'Google Calendar',
+      description: 'Direct OAuth connection. Coming soon—configure later from Settings.',
+      icon: Globe,
+      disabled: true,
+      note: 'Coming Soon',
+      comingSoon: true,
+    },
+  ]), [isRequesting]);
   
   const currentStep = steps.find(step => step.id === 'calendar');
   const isCompleted = currentStep?.completed || false;
@@ -52,83 +73,97 @@ export function CalendarPermissionScreen() {
               <Calendar size={48} color="#007AFF" />
             )}
           </View>
-          <Text style={styles.title}>Calendar Integration</Text>
+          <Text style={styles.title}>Calendar Connection</Text>
           <Text style={styles.subtitle}>
-            {isCompleted 
-              ? 'Calendar connected successfully!'
-              : 'Choose your calendar source for meeting insights'
+            {isCompleted
+              ? 'Calendar connected — Kin will add meetings to your timeline.'
+              : 'Connect a calendar so Kin can layer meetings onto your relationship history.'
             }
           </Text>
         </View>
 
         {!isCompleted && (
           <View style={styles.options}>
-            <TouchableOpacity 
-              style={[
-                styles.optionCard,
-                Platform.OS === 'web' && styles.optionCardDisabled,
-                selectedSource === 'eventkit' && styles.optionCardSelected
-              ]}
-              onPress={() => handleSelectSource('eventkit')}
-              disabled={Platform.OS === 'web' || isRequesting}
-            >
-              <View style={styles.optionHeader}>
-                <Smartphone size={24} color={Platform.OS === 'web' ? '#CCC' : '#007AFF'} />
-                <Text style={[styles.optionTitle, Platform.OS === 'web' && styles.optionTitleDisabled]}>
-                  Device Calendar
-                </Text>
-              </View>
-              <Text style={[styles.optionDescription, Platform.OS === 'web' && styles.optionDescriptionDisabled]}>
-                Use your device's built-in calendar app (iOS Calendar, Google Calendar, etc.)
-              </Text>
-              {Platform.OS === 'web' && (
-                <Text style={styles.notAvailable}>Not available on web</Text>
-              )}
-              {isRequesting && selectedSource === 'eventkit' && (
-                <ActivityIndicator size="small" color="#007AFF" style={styles.optionLoader} />
-              )}
-            </TouchableOpacity>
+            {calendarOptions.map(option => {
+              const IconComponent = option.icon;
+              const isSelected = selectedSource === option.id;
+              const disabled = option.disabled;
 
-            <TouchableOpacity 
-              style={[
-                styles.optionCard,
-                selectedSource === 'google' && styles.optionCardSelected
-              ]}
-              onPress={() => handleSelectSource('google')}
-              disabled={isRequesting}
-            >
-              <View style={styles.optionHeader}>
-                <Globe size={24} color="#007AFF" />
-                <Text style={styles.optionTitle}>Google Calendar</Text>
-              </View>
-              <Text style={styles.optionDescription}>
-                Connect directly to Google Calendar via OAuth (works on all platforms)
-              </Text>
-              {isRequesting && selectedSource === 'google' && (
-                <ActivityIndicator size="small" color="#007AFF" style={styles.optionLoader} />
-              )}
-            </TouchableOpacity>
+              return (
+                <TouchableOpacity
+                  key={option.id}
+                  style={[
+                    styles.optionCard,
+                    disabled && styles.optionCardDisabled,
+                    isSelected && styles.optionCardSelected,
+                  ]}
+                  onPress={() => {
+                    if (option.comingSoon) return;
+                    handleSelectSource(option.id);
+                  }}
+                  disabled={disabled}
+                >
+                  <View style={styles.optionHeader}>
+                    <IconComponent size={24} color={disabled ? '#94A3B8' : '#007AFF'} />
+                    <Text
+                      style={[
+                        styles.optionTitle,
+                        disabled && styles.optionTitleDisabled,
+                      ]}
+                    >
+                      {option.title}
+                    </Text>
+                    {option.comingSoon && (
+                      <View style={styles.comingSoonBadge}>
+                        <Text style={styles.comingSoonText}>{option.note}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text
+                    style={[
+                      styles.optionDescription,
+                      disabled && styles.optionDescriptionDisabled,
+                    ]}
+                  >
+                    {option.description}
+                  </Text>
+                  {!option.comingSoon && option.note && (
+                    <Text
+                      style={[
+                        styles.optionNote,
+                        option.note === 'Not available on web' && styles.optionNoteWarning,
+                      ]}
+                    >
+                      {option.note}
+                    </Text>
+                  )}
+                  {isRequesting && isSelected && (
+                    <ActivityIndicator size="small" color="#007AFF" style={styles.optionLoader} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
 
         <View style={styles.explanation}>
-          <Text style={styles.explanationTitle}>Meeting Intelligence</Text>
+          <Text style={styles.explanationTitle}>Meeting intelligence</Text>
           <Text style={styles.explanationText}>
-            Calendar integration helps Kin understand your meeting patterns and 
-            automatically track interactions with attendees.
+            Calendar access lets Kin understand who you meet with and how often.
+            We only read event metadata and attendees — everything is stored locally.
           </Text>
-          
+
           <View style={styles.bulletPoint}>
             <Text style={styles.bullet}>•</Text>
-            <Text style={styles.bulletText}>Identify meeting participants</Text>
+            <Text style={styles.bulletText}>Identify meeting participants and link them to existing contacts</Text>
           </View>
           <View style={styles.bulletPoint}>
             <Text style={styles.bullet}>•</Text>
-            <Text style={styles.bulletText}>Track meeting frequency with contacts</Text>
+            <Text style={styles.bulletText}>Track meeting frequency and follow-up needs automatically</Text>
           </View>
           <View style={styles.bulletPoint}>
             <Text style={styles.bullet}>•</Text>
-            <Text style={styles.bulletText}>Analyze relationship patterns over time</Text>
+            <Text style={styles.bulletText}>Keep all data on-device with full control to revoke later</Text>
           </View>
         </View>
 
@@ -160,11 +195,6 @@ export function CalendarPermissionScreen() {
           </TouchableOpacity>
         )}
         
-        {isCompleted && (
-          <TouchableOpacity style={styles.primaryButton} onPress={() => {}}>
-            <Text style={styles.primaryButtonText}>Continue</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </SafeAreaView>
   );
@@ -251,16 +281,32 @@ const styles = StyleSheet.create({
   optionDescriptionDisabled: {
     color: '#999',
   },
-  notAvailable: {
+  optionNote: {
     fontSize: 12,
+    color: '#007AFF',
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  optionNoteWarning: {
     color: '#FF3B30',
-    fontStyle: 'italic',
-    marginTop: 4,
   },
   optionLoader: {
     position: 'absolute',
     top: 20,
     right: 20,
+  },
+  comingSoonBadge: {
+    marginLeft: 8,
+    backgroundColor: '#FFB020',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  comingSoonText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.4,
   },
   explanation: {
     backgroundColor: '#FFFFFF',
@@ -325,18 +371,6 @@ const styles = StyleSheet.create({
   footer: {
     padding: 24,
     paddingBottom: 32,
-  },
-  primaryButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
   },
   secondaryButton: {
     backgroundColor: 'transparent',
