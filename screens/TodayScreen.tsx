@@ -406,7 +406,7 @@ export const TodayScreen: React.FC = () => {
           {peopleToReachOut.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Stay in Touch</Text>
-              <Text style={styles.sectionSubtitle}>You haven&apos;t connected in a while</Text>
+              <Text style={styles.sectionSubtitle}>You haven't connected in a while</Text>
               {peopleToReachOut.map(person => (
                 <PersonCard
                   key={person.id}
