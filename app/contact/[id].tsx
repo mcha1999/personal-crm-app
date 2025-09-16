@@ -169,7 +169,7 @@ export default function ContactScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.avatarSection}>
-              {person.avatar ? (
+              {person.avatar && person.avatar.trim() !== '' ? (
                 <Image source={{ uri: person.avatar }} style={styles.avatar} />
               ) : (
                 <View style={[styles.avatar, styles.avatarPlaceholder]}>

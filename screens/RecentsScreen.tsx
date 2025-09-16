@@ -133,7 +133,7 @@ const SwipeablePersonRow: React.FC<SwipeablePersonRowProps> = ({
           activeOpacity={0.7}
         >
           <View style={styles.avatarContainer}>
-            {person.avatar ? (
+            {person.avatar && person.avatar.trim() !== '' ? (
               <Image source={{ uri: person.avatar }} style={styles.avatar} />
             ) : (
               <View style={[styles.avatar, styles.avatarPlaceholder]}>
