@@ -99,7 +99,7 @@ export const FollowUpTaskCard: React.FC<FollowUpTaskCardProps> = ({
               ]}>
                 {dueToday ? 'Due today' : 
                  isOverdue ? 'Overdue' : 
-                 task.dueDate.toLocaleDateString()}
+                 task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}
               </Text>
             </View>
           )}
