@@ -161,7 +161,7 @@ export function ManualEmailLogger() {
           <View style={styles.infoCard}>
             <Calendar size={16} color="#007AFF" />
             <Text style={styles.infoText}>
-              This email will be logged with today&apos;s date and time
+              This email will be logged with the current date and time
             </Text>
           </View>
         </ScrollView>
