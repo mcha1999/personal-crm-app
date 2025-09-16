@@ -14,6 +14,7 @@ import { ContactsPermissionScreen } from './onboarding/ContactsPermissionScreen'
 import { CalendarPermissionScreen } from './onboarding/CalendarPermissionScreen';
 import { EmailPermissionScreen } from './onboarding/EmailPermissionScreen';
 import { SyncWindowScreen } from './onboarding/SyncWindowScreen';
+import { WelcomeSplashScreen } from './onboarding/WelcomeSplashScreen';
 
 export function OnboardingFlow() {
   const {
@@ -57,6 +58,8 @@ export function OnboardingFlow() {
     if (!step) return null;
     
     switch (step.id) {
+      case 'welcome':
+        return <WelcomeSplashScreen />;
       case 'privacy':
         return <PrivacyScreen />;
       case 'contacts':
@@ -74,54 +77,58 @@ export function OnboardingFlow() {
   
   const isLastStep = localStep === steps.length - 1;
   const currentStepData = steps[localStep];
+  const isWelcomeStep = currentStepData?.id === 'welcome';
   const canContinue = currentStepData?.completed || currentStepData?.skipped;
-  
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, isWelcomeStep && styles.containerDark]}>
+      <View style={[styles.header, isWelcomeStep && styles.headerOnDark]}>
         <View style={styles.progressContainer}>
           {steps.map((step, index) => (
             <View
               key={step.id}
               style={[
                 styles.progressDot,
-                index === localStep && styles.progressDotActive,
-                (step.completed || step.skipped) && styles.progressDotCompleted,
+                isWelcomeStep && styles.progressDotOnDark,
+                index === localStep && (isWelcomeStep ? styles.progressDotActiveOnDark : styles.progressDotActive),
+                (step.completed || step.skipped) && (isWelcomeStep ? styles.progressDotCompletedOnDark : styles.progressDotCompleted),
               ]}
             />
           ))}
         </View>
-        
-        <Text style={styles.stepIndicator}>
+
+        <Text style={[styles.stepIndicator, isWelcomeStep && styles.stepIndicatorOnDark]}>
           Step {localStep + 1} of {steps.length}
         </Text>
       </View>
-      
-      <ScrollView 
+
+      <ScrollView
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
         {renderStep()}
       </ScrollView>
-      
-      <View style={styles.footer}>
-        {canContinue && (
-          <TouchableOpacity
-            style={styles.continueButton}
-            onPress={isLastStep ? handleComplete : handleNext}
-          >
-            <Text style={styles.continueButtonText}>
-              {isLastStep ? 'Get Started' : 'Continue'}
-            </Text>
-            {isLastStep ? (
-              <Check size={20} color="#FFFFFF" />
-            ) : (
-              <ChevronRight size={20} color="#FFFFFF" />
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
+
+      {!isWelcomeStep && (
+        <View style={styles.footer}>
+          {canContinue && (
+            <TouchableOpacity
+              style={styles.continueButton}
+              onPress={isLastStep ? handleComplete : handleNext}
+            >
+              <Text style={styles.continueButtonText}>
+                {isLastStep ? 'Get Started' : 'Continue'}
+              </Text>
+              {isLastStep ? (
+                <Check size={20} color="#FFFFFF" />
+              ) : (
+                <ChevronRight size={20} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -131,11 +138,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8F9FA',
   },
+  containerDark: {
+    backgroundColor: '#020617',
+  },
   header: {
     paddingHorizontal: 24,
     paddingTop: 16,
     paddingBottom: 8,
     alignItems: 'center',
+  },
+  headerOnDark: {
+    borderBottomColor: 'rgba(148, 163, 184, 0.25)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   progressContainer: {
     flexDirection: 'row',
@@ -149,17 +163,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#E0E0E0',
     marginHorizontal: 4,
   },
+  progressDotOnDark: {
+    backgroundColor: 'rgba(148, 163, 184, 0.35)',
+  },
   progressDotActive: {
     width: 24,
     backgroundColor: '#007AFF',
   },
+  progressDotActiveOnDark: {
+    width: 24,
+    backgroundColor: '#60A5FA',
+  },
   progressDotCompleted: {
     backgroundColor: '#34C759',
+  },
+  progressDotCompletedOnDark: {
+    backgroundColor: '#34D399',
   },
   stepIndicator: {
     fontSize: 14,
     color: '#666',
     fontWeight: '500',
+  },
+  stepIndicatorOnDark: {
+    color: 'rgba(226, 232, 240, 0.85)',
   },
   content: {
     flex: 1,
