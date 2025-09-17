@@ -595,7 +595,7 @@ export class ImapService {
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      this.transport = require(SOCKET_LIBRARY_NAME);
+      this.transport = require('react-native-tcp-socket') as TcpSocketModule;
       return this.transport;
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'Unknown error';
