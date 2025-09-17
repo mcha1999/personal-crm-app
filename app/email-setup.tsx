@@ -10,12 +10,14 @@ import {
   Alert,
   SafeAreaView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Mail, Server, Lock, HelpCircle, X } from 'lucide-react-native';
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { imapService } from '../services/ImapService';
 
 interface EmailProvider {
   name: string;
@@ -23,6 +25,15 @@ interface EmailProvider {
   port: number;
   tls: boolean;
   icon: string;
+}
+
+interface ImapAccountConfig {
+  email: string;
+  appPassword: string;
+  host: string;
+  port: number;
+  tls: boolean;
+  provider: string;
 }
 
 const EMAIL_PROVIDERS: EmailProvider[] = [
@@ -41,30 +52,95 @@ export default function EmailAccountSetupScreen() {
   const [port, setPort] = useState<string>('993');
   const [tls, setTls] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const { setEmailMethod } = useOnboarding();
+  const [isTesting, setIsTesting] = useState<boolean>(false);
+  const [lastValidatedConfig, setLastValidatedConfig] = useState<ImapAccountConfig | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const { setEmailMethod, setStepInProgress, setStepError } = useOnboarding();
+
+  const resetValidation = () => {
+    setLastValidatedConfig(null);
+    setConnectionStatus(null);
+  };
+
+  const buildConfig = (): ImapAccountConfig | null => {
+    if (!email || !appPassword || !host || !port) {
+      return null;
+    }
+
+    const parsedPort = parseInt(port, 10);
+    if (Number.isNaN(parsedPort) || parsedPort <= 0) {
+      return null;
+    }
+
+    return {
+      email: email.trim(),
+      appPassword,
+      host: host.trim(),
+      port: parsedPort,
+      tls,
+      provider: selectedProvider?.name || 'Custom',
+    };
+  };
 
   const handleProviderSelect = (provider: EmailProvider) => {
     setSelectedProvider(provider);
     setHost(provider.host);
     setPort(provider.port.toString());
     setTls(provider.tls);
+    resetValidation();
+  };
+
+  const handleTestConnection = async () => {
+    const config = buildConfig();
+
+    if (!config) {
+      Alert.alert('Invalid Settings', 'Please make sure all fields are filled out correctly before testing.');
+      return;
+    }
+
+    setIsTesting(true);
+    setConnectionStatus(null);
+    setStepInProgress('email', true);
+
+    try {
+      const result = await imapService.testConnection(config);
+
+      if (result.success) {
+        setLastValidatedConfig(config);
+        setConnectionStatus({ type: 'success', message: 'Connection successful. Ready to save and sync.' });
+        setStepInProgress('email', false);
+        Alert.alert('Connection Successful', 'Your IMAP settings are valid. You can now save this account.');
+      } else {
+        const errorMessage = result.error ?? 'Unable to connect to the IMAP server. Please verify your settings and try again.';
+        setLastValidatedConfig(null);
+        setConnectionStatus({ type: 'error', message: errorMessage });
+        setStepError('email', errorMessage);
+        Alert.alert('Connection Failed', errorMessage);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unexpected error while testing the connection.';
+      setLastValidatedConfig(null);
+      setConnectionStatus({ type: 'error', message: errorMessage });
+      setStepError('email', errorMessage);
+      Alert.alert('Connection Failed', errorMessage);
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   const handleSave = async () => {
-    if (!email || !appPassword || !host || !port) {
-      Alert.alert('Missing Information', 'Please fill in all required fields.');
+    if (!lastValidatedConfig) {
+      Alert.alert('Test Required', 'Please test your IMAP connection successfully before saving.');
       return;
     }
 
     setIsLoading(true);
+    setStepInProgress('email', true);
+
+    let encounteredError = false;
     try {
       const emailConfig = {
-        email,
-        appPassword,
-        host,
-        port: parseInt(port),
-        tls,
-        provider: selectedProvider?.name || 'Custom',
+        ...lastValidatedConfig,
         createdAt: new Date().toISOString(),
       };
 
@@ -74,18 +150,38 @@ export default function EmailAccountSetupScreen() {
         await AsyncStorage.setItem('email_config', JSON.stringify(emailConfig));
       }
 
+      const syncResult = await imapService.syncMailbox();
+      if (!syncResult.success) {
+        const errorMessage = syncResult.error ?? 'Failed to run the initial mailbox sync. Please try again.';
+        encounteredError = true;
+        setStepError('email', errorMessage);
+        setConnectionStatus({ type: 'error', message: errorMessage });
+        Alert.alert('Sync Failed', errorMessage);
+        return;
+      }
+
       await setEmailMethod('imap');
+      setConnectionStatus({ type: 'success', message: 'Initial sync completed successfully.' });
 
       Alert.alert(
         'Account Saved',
-        'Account saved locally. IMAP sync will run in background.',
+        'Your IMAP account is connected and the first sync has completed successfully.',
         [{ text: 'OK', onPress: () => router.back() }]
       );
     } catch (error) {
+      encounteredError = true;
       console.error('Failed to save email config:', error);
-      Alert.alert('Error', 'Failed to save email configuration. Please try again.');
+      const errorMessage = error instanceof Error
+        ? error.message
+        : 'Failed to save email configuration. Please try again.';
+      setStepError('email', errorMessage);
+      setConnectionStatus({ type: 'error', message: errorMessage });
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsLoading(false);
+      if (!encounteredError) {
+        setStepInProgress('email', false);
+      }
     }
   };
 
@@ -141,7 +237,10 @@ export default function EmailAccountSetupScreen() {
                 <TextInput
                   style={styles.textInput}
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={value => {
+                    setEmail(value);
+                    resetValidation();
+                  }}
                   placeholder="your.email@example.com"
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -162,7 +261,10 @@ export default function EmailAccountSetupScreen() {
                 <TextInput
                   style={styles.textInput}
                   value={appPassword}
-                  onChangeText={setAppPassword}
+                  onChangeText={value => {
+                    setAppPassword(value);
+                    resetValidation();
+                  }}
                   placeholder="App-specific password"
                   secureTextEntry
                   autoCapitalize="none"
@@ -178,7 +280,10 @@ export default function EmailAccountSetupScreen() {
                 <TextInput
                   style={styles.textInput}
                   value={host}
-                  onChangeText={setHost}
+                  onChangeText={value => {
+                    setHost(value);
+                    resetValidation();
+                  }}
                   placeholder="imap.example.com"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -192,7 +297,10 @@ export default function EmailAccountSetupScreen() {
                 <TextInput
                   style={styles.portTextInput}
                   value={port}
-                  onChangeText={setPort}
+                  onChangeText={value => {
+                    setPort(value);
+                    resetValidation();
+                  }}
                   placeholder="993"
                   keyboardType="numeric"
                 />
@@ -202,7 +310,10 @@ export default function EmailAccountSetupScreen() {
                 <Text style={styles.inputLabel}>TLS/SSL</Text>
                 <Switch
                   value={tls}
-                  onValueChange={setTls}
+                  onValueChange={value => {
+                    setTls(value);
+                    resetValidation();
+                  }}
                   trackColor={{ false: '#E5E5E7', true: '#007AFF' }}
                   thumbColor={tls ? '#FFFFFF' : '#F4F3F4'}
                 />
@@ -215,17 +326,42 @@ export default function EmailAccountSetupScreen() {
       {selectedProvider && (
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.button, styles.testButton]}
-            disabled
+            style={[
+              styles.button,
+              styles.testButton,
+              (isTesting || isLoading) && styles.buttonDisabled,
+            ]}
+            onPress={handleTestConnection}
+            disabled={isTesting || isLoading}
           >
-            <Text style={styles.testButtonText}>Test Connection</Text>
-            <Text style={styles.comingSoonText}>(Coming Soon)</Text>
+            {isTesting ? (
+              <ActivityIndicator size="small" color="#007AFF" />
+            ) : (
+              <Text style={styles.testButtonText}>Test Connection</Text>
+            )}
           </TouchableOpacity>
-          
+
+          {connectionStatus && (
+            <Text
+              style={[
+                styles.connectionStatusText,
+                connectionStatus.type === 'success'
+                  ? styles.connectionStatusSuccess
+                  : styles.connectionStatusError,
+              ]}
+            >
+              {connectionStatus.message}
+            </Text>
+          )}
+
           <TouchableOpacity
-            style={[styles.button, styles.saveButton]}
+            style={[
+              styles.button,
+              styles.saveButton,
+              (isLoading || isTesting || !lastValidatedConfig) && styles.buttonDisabled,
+            ]}
             onPress={handleSave}
-            disabled={isLoading}
+            disabled={isLoading || isTesting || !lastValidatedConfig}
           >
             <Text style={styles.saveButtonText}>
               {isLoading ? 'Saving...' : 'Save Account'}
@@ -379,19 +515,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   testButton: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#E8F0FF',
     borderWidth: 1,
-    borderColor: '#E5E5E7',
+    borderColor: '#007AFF',
   },
   testButtonText: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#999999',
+    fontWeight: '600',
+    color: '#007AFF',
   },
-  comingSoonText: {
-    fontSize: 12,
-    color: '#999999',
-    marginTop: 2,
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  connectionStatusText: {
+    fontSize: 14,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  connectionStatusSuccess: {
+    color: '#34C759',
+  },
+  connectionStatusError: {
+    color: '#FF3B30',
   },
   saveButton: {
     backgroundColor: '#007AFF',
