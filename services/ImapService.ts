@@ -482,6 +482,14 @@ export class ImapService {
   }
 
   async testConnection(config?: Partial<ImapAccountConfig>): Promise<ImapTestResult> {
+    const support = await this.isSyncSupported();
+    if (!support.supported) {
+      return {
+        success: false,
+        error: support.reason ?? 'IMAP sync is not supported in this environment',
+      };
+    }
+
     const account = config ? this.normalizeConfig(config) : await this.loadStoredConfig();
 
     if (!account) {
