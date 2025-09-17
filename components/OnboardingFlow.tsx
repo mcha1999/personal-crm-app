@@ -82,29 +82,34 @@ export function OnboardingFlow() {
 
   return (
     <SafeAreaView style={[styles.container, isWelcomeStep && styles.containerDark]}>
-      <View style={[styles.header, isWelcomeStep && styles.headerOnDark]}>
-        <View style={styles.progressContainer}>
-          {steps.map((step, index) => (
-            <View
-              key={step.id}
-              style={[
-                styles.progressDot,
-                isWelcomeStep && styles.progressDotOnDark,
-                index === localStep && (isWelcomeStep ? styles.progressDotActiveOnDark : styles.progressDotActive),
-                (step.completed || step.skipped) && (isWelcomeStep ? styles.progressDotCompletedOnDark : styles.progressDotCompleted),
-              ]}
-            />
-          ))}
-        </View>
+      {!isWelcomeStep && (
+        <View style={[styles.header, isWelcomeStep && styles.headerOnDark]}>
+          <View style={styles.progressContainer}>
+            {steps.map((step, index) => (
+              <View
+                key={step.id}
+                style={[
+                  styles.progressDot,
+                  isWelcomeStep && styles.progressDotOnDark,
+                  index === localStep && (isWelcomeStep ? styles.progressDotActiveOnDark : styles.progressDotActive),
+                  (step.completed || step.skipped) && (isWelcomeStep ? styles.progressDotCompletedOnDark : styles.progressDotCompleted),
+                ]}
+              />
+            ))}
+          </View>
 
-        <Text style={[styles.stepIndicator, isWelcomeStep && styles.stepIndicatorOnDark]}>
-          Step {localStep + 1} of {steps.length}
-        </Text>
-      </View>
+          <Text style={[styles.stepIndicator, isWelcomeStep && styles.stepIndicatorOnDark]}>
+            Step {localStep + 1} of {steps.length}
+          </Text>
+        </View>
+      )}
 
       <ScrollView
         style={styles.content}
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={[
+          styles.contentContainer,
+          isWelcomeStep && styles.welcomeContentContainer,
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {renderStep()}
@@ -193,6 +198,9 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flexGrow: 1,
+  },
+  welcomeContentContainer: {
+    paddingTop: 16,
   },
   footer: {
     paddingHorizontal: 24,
