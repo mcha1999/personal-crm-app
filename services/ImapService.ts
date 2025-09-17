@@ -2,29 +2,35 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 
+import TcpSocketTransport from './TcpSocketTransport';
+
 import type { TcpSocket, TcpSocketConnectOpts } from 'react-native-tcp-socket';
 
 type TcpSocketModule = typeof import('react-native-tcp-socket');
 
 const SOCKET_LIBRARY_NAME = 'react-native-tcp-socket';
+const SOCKET_LOAD_ERROR_MESSAGE = `Failed to load ${SOCKET_LIBRARY_NAME}. Ensure the library is installed and linked.`;
 
 let cachedTransport: TcpSocketModule | null = null;
 let transportInitializationError: Error | null = null;
 
-if (Platform.OS !== 'web') {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    cachedTransport = require('react-native-tcp-socket') as TcpSocketModule;
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : 'Unknown error';
-    const message = `Failed to load ${SOCKET_LIBRARY_NAME}. Ensure the library is installed and linked. ${reason}`;
+try {
+  const resolvedTransport = TcpSocketTransport as TcpSocketModule | null;
 
-    if (error instanceof Error) {
-      error.message = message;
-      transportInitializationError = error;
-    } else {
-      transportInitializationError = new Error(message);
-    }
+  if (resolvedTransport) {
+    cachedTransport = resolvedTransport;
+  } else {
+    transportInitializationError = new Error(SOCKET_LOAD_ERROR_MESSAGE);
+  }
+} catch (error) {
+  const reason = error instanceof Error ? error.message : 'Unknown error';
+  const message = `${SOCKET_LOAD_ERROR_MESSAGE} ${reason}`;
+
+  if (error instanceof Error) {
+    error.message = message;
+    transportInitializationError = error;
+  } else {
+    transportInitializationError = new Error(message);
   }
 }
 
@@ -624,7 +630,7 @@ export class ImapService {
       throw transportInitializationError;
     }
 
-    throw new Error(`Failed to load ${SOCKET_LIBRARY_NAME}. Ensure the library is installed and linked.`);
+    throw new Error(SOCKET_LOAD_ERROR_MESSAGE);
   }
 
   private async loadStoredConfig(): Promise<ImapAccountConfig | null> {
