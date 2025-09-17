@@ -6,6 +6,28 @@ import type { TcpSocket, TcpSocketConnectOpts } from 'react-native-tcp-socket';
 
 type TcpSocketModule = typeof import('react-native-tcp-socket');
 
+const SOCKET_LIBRARY_NAME = 'react-native-tcp-socket';
+
+let cachedTransport: TcpSocketModule | null = null;
+let transportInitializationError: Error | null = null;
+
+if (Platform.OS !== 'web') {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    cachedTransport = require(SOCKET_LIBRARY_NAME) as TcpSocketModule;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'Unknown error';
+    const message = `Failed to load ${SOCKET_LIBRARY_NAME}. Ensure the library is installed and linked. ${reason}`;
+
+    if (error instanceof Error) {
+      error.message = message;
+      transportInitializationError = error;
+    } else {
+      transportInitializationError = new Error(message);
+    }
+  }
+}
+
 interface ImapAccountConfig {
   email: string;
   appPassword: string;
@@ -451,11 +473,8 @@ class ImapConnection {
   }
 }
 
-const SOCKET_LIBRARY_NAME = 'react-native-tcp-socket';
-
 export class ImapService {
   private static instance: ImapService | null = null;
-  private transport: TcpSocketModule | null = null;
   private readonly configKey = 'email_config';
 
   static getInstance(): ImapService {
@@ -597,18 +616,15 @@ export class ImapService {
   }
 
   private loadTransport(): TcpSocketModule {
-    if (this.transport) {
-      return this.transport;
+    if (cachedTransport) {
+      return cachedTransport;
     }
 
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      this.transport = require('react-native-tcp-socket') as TcpSocketModule;
-      return this.transport;
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to load ${SOCKET_LIBRARY_NAME}. Ensure the library is installed and linked. ${reason}`);
+    if (transportInitializationError) {
+      throw transportInitializationError;
     }
+
+    throw new Error(`Failed to load ${SOCKET_LIBRARY_NAME}. Ensure the library is installed and linked.`);
   }
 
   private async loadStoredConfig(): Promise<ImapAccountConfig | null> {
