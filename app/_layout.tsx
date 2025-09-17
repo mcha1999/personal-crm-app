@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, usePathname, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -8,7 +8,6 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ContactsProvider } from "@/contexts/ContactsContext";
 import { OnboardingProvider, useOnboarding } from "@/contexts/OnboardingContext";
 import { AuthScreen } from "@/components/AuthScreen";
-import { OnboardingFlow } from "@/components/OnboardingFlow";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { BackgroundTaskManager } from "@/services/BackgroundTaskManager";
 
@@ -24,6 +23,7 @@ function RootLayoutNav() {
       <Stack.Screen name="permissions" options={{ presentation: "modal", title: "Permissions" }} />
       <Stack.Screen name="health" options={{ presentation: "modal", title: "Health Check" }} />
       <Stack.Screen name="ai-demo" options={{ presentation: "modal", title: "AI Demo" }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="email-setup" options={{ presentation: "modal", title: "Email Setup" }} />
     </Stack>
   );
@@ -33,11 +33,13 @@ function AppContent() {
   const { isInitialized, error } = useDatabase();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isOnboardingCompleted, isLoading: onboardingLoading } = useOnboarding();
+  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (isInitialized && !authLoading && !onboardingLoading) {
       SplashScreen.hideAsync();
-      
+
       // Initialize background tasks when app is ready
       // Note: Background tasks don't work in Expo Go, but will work in production builds
       const initBackgroundTasks = async () => {
@@ -50,10 +52,39 @@ function AppContent() {
           console.log('[App] Background tasks not available in Expo Go (will work in production)');
         }
       };
-      
+
       initBackgroundTasks();
     }
   }, [isInitialized, authLoading, onboardingLoading]);
+
+  useEffect(() => {
+    if (!isInitialized || authLoading || onboardingLoading) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      return;
+    }
+
+    const onboardingPaths = ["/onboarding", "/email-setup", "/gmail-setup"];
+    const isInOnboardingFlow = pathname ? onboardingPaths.some(path => pathname.startsWith(path)) : false;
+
+    if (!isOnboardingCompleted) {
+      if (!isInOnboardingFlow) {
+        router.replace("/onboarding");
+      }
+    } else if (pathname === "/onboarding") {
+      router.replace("/(tabs)");
+    }
+  }, [
+    authLoading,
+    isAuthenticated,
+    isInitialized,
+    isOnboardingCompleted,
+    onboardingLoading,
+    pathname,
+    router,
+  ]);
 
   if (error) {
     return (
@@ -77,10 +108,6 @@ function AppContent() {
 
   if (!isAuthenticated) {
     return <AuthScreen />;
-  }
-  
-  if (!isOnboardingCompleted) {
-    return <OnboardingFlow />;
   }
 
   return <RootLayoutNav />;
