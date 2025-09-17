@@ -7,7 +7,6 @@ import { DatabaseProvider, useDatabase } from "@/contexts/DatabaseContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ContactsProvider } from "@/contexts/ContactsContext";
 import { OnboardingProvider, useOnboarding } from "@/contexts/OnboardingContext";
-import { AuthScreen } from "@/components/AuthScreen";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { BackgroundTaskManager } from "@/services/BackgroundTaskManager";
 
@@ -15,9 +14,14 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
-function RootLayoutNav() {
+type RootLayoutNavProps = {
+  initialRouteName: string;
+};
+
+function RootLayoutNav({ initialRouteName }: RootLayoutNavProps) {
   return (
-    <Stack screenOptions={{ headerBackTitle: "Back" }}>
+    <Stack initialRouteName={initialRouteName} screenOptions={{ headerBackTitle: "Back" }}>
+      <Stack.Screen name="auth" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="contact/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="permissions" options={{ presentation: "modal", title: "Permissions" }} />
@@ -63,6 +67,9 @@ function AppContent() {
     }
 
     if (!isAuthenticated) {
+      if (pathname !== "/auth") {
+        router.replace("/auth");
+      }
       return;
     }
 
@@ -73,7 +80,10 @@ function AppContent() {
       if (!isInOnboardingFlow) {
         router.replace("/onboarding");
       }
-    } else if (pathname === "/onboarding") {
+      return;
+    }
+
+    if (pathname === "/onboarding" || pathname === "/auth") {
       router.replace("/(tabs)");
     }
   }, [
@@ -106,11 +116,13 @@ function AppContent() {
     );
   }
 
-  if (!isAuthenticated) {
-    return <AuthScreen />;
-  }
+  const initialRouteName = !isAuthenticated
+    ? 'auth'
+    : !isOnboardingCompleted
+      ? 'onboarding'
+      : '(tabs)';
 
-  return <RootLayoutNav />;
+  return <RootLayoutNav key={initialRouteName} initialRouteName={initialRouteName} />;
 }
 
 export default function RootLayout() {
