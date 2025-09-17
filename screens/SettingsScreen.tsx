@@ -56,7 +56,14 @@ export const SettingsScreen: React.FC = () => {
   const { isAuthEnabled, enableAuth, disableAuth, getSupportedAuthTypes } = useAuth();
   const { isImporting, lastImportResult, lastImportDate, error: contactsError, importContacts, clearError } = useContacts();
   const { database, isInitialized } = useDatabase();
-  const { requestContactsPermission, requestCalendarPermission, syncPreferences, resetOnboarding } = useOnboarding();
+  const { requestContactsPermission, requestCalendarPermission, syncPreferences, resetOnboarding, steps } = useOnboarding();
+
+  const emailStep = steps.find(step => step.id === 'email');
+  const emailConnectionError = emailStep?.error;
+  const emailLinkIconColor = emailConnectionError ? '#FF3B30' : '#007AFF';
+  const emailLinkSubtitle = emailConnectionError
+    ? `Connection issue: ${emailConnectionError}`
+    : 'Add Gmail, Outlook, iCloud, or custom IMAP';
   
   // Check permission states from sync preferences
   const isContactsEnabled = syncPreferences.contactsEnabled;
@@ -523,9 +530,9 @@ export const SettingsScreen: React.FC = () => {
           onPress: handleEnableCalendar,
         }] : []),
         {
-          icon: <Mail size={20} color="#007AFF" />,
+          icon: <Mail size={20} color={emailLinkIconColor} />,
           label: 'Link Email Account (IMAP)',
-          subtitle: 'Add Gmail, Outlook, iCloud, or custom IMAP',
+          subtitle: emailLinkSubtitle,
           type: 'action' as const,
           onPress: () => router.push('/email-setup'),
         },

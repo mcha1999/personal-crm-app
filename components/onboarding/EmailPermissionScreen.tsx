@@ -6,17 +6,20 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
-import { Mail, CheckCircle, Zap, Server } from 'lucide-react-native';
+import { Mail, CheckCircle, Zap, Server, AlertCircle } from 'lucide-react-native';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { router } from 'expo-router';
 
 export function EmailPermissionScreen() {
   const { setEmailMethod, steps } = useOnboarding();
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
-  
+
   const currentStep = steps.find(step => step.id === 'email');
   const isCompleted = currentStep?.completed || false;
+  const hasError = !!currentStep?.error;
+  const isInProgress = !!currentStep?.inProgress;
 
   const emailMethods = [
     {
@@ -91,6 +94,20 @@ export function EmailPermissionScreen() {
             Connect with secure App Passwords to let Kin analyze headers and metadata locally. Everything is processed on this device and saved to encrypted SQLite.
           </Text>
         </View>
+
+        {hasError && (
+          <View style={styles.errorContainer}>
+            <AlertCircle size={20} color="#FF3B30" />
+            <Text style={styles.errorText}>{currentStep?.error}</Text>
+          </View>
+        )}
+
+        {isInProgress && (
+          <View style={styles.progressContainer}>
+            <ActivityIndicator size="small" color="#007AFF" />
+            <Text style={styles.progressText}>Connecting to your mailbox...</Text>
+          </View>
+        )}
 
         <View style={styles.privacyCard}>
           <CheckCircle size={20} color="#34C759" />
@@ -286,6 +303,35 @@ const styles = StyleSheet.create({
   },
   methodsContainer: {
     marginBottom: 32,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#FFF5F5',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#FF3B30',
+    lineHeight: 20,
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#007AFF',
+    flex: 1,
   },
   methodsTitle: {
     fontSize: 18,
