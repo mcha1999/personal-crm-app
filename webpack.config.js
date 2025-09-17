@@ -1,3 +1,4 @@
+const path = require('path');
 const createExpoWebpackConfigAsync = require('@expo/webpack-config');
 
 module.exports = async function (env, argv) {
@@ -8,6 +9,7 @@ module.exports = async function (env, argv) {
     ...config.resolve.alias,
     'lottie-react-native': './lottie-react-native.web.js',
     '@lottiefiles/dotlottie-react': './dotlottie-react.web.js',
+    '@': path.resolve(__dirname, '.'),
   };
   
   return config;
