@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
+import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 // import { GmailSync } from './GmailSync'; // Conditionally imported when needed
 import { ScoreJob } from '@/jobs/ScoreJob';
@@ -8,6 +9,7 @@ import { FollowUpService } from './FollowUpService';
 
 // Task names
 const GMAIL_DELTA_SYNC_TASK = 'gmailDeltaSync';
+const IMAP_SYNC_TASK = 'imapSync';
 const INDEX_AND_SCORE_TASK = 'indexAndScore';
 
 /**
@@ -27,10 +29,13 @@ const INDEX_AND_SCORE_TASK = 'indexAndScore';
 export class BackgroundTaskManager {
   private static instance: BackgroundTaskManager;
   private gmailSyncInterval = 4 * 60 * 60 * 1000; // 4 hours (few times per day)
+  private imapSyncInterval = 4 * 60 * 60 * 1000; // 4 hours (few times per day)
   private indexScoreInterval = 24 * 60 * 60 * 1000; // 24 hours (nightly)
   private lastGmailSync: Date | null = null;
+  private lastImapSync: Date | null = null;
   private lastIndexScore: Date | null = null;
   private isInitialized = false;
+  private readonly imapConfigKey = 'email_config';
 
   private constructor() {
     this.loadLastRunTimes();
@@ -47,10 +52,14 @@ export class BackgroundTaskManager {
   private async loadLastRunTimes() {
     try {
       const gmailSyncTime = await AsyncStorage.getItem('lastGmailSync');
+      const imapSyncTime = await AsyncStorage.getItem('lastImapSync');
       const indexScoreTime = await AsyncStorage.getItem('lastIndexScore');
-      
+
       if (gmailSyncTime) {
         this.lastGmailSync = new Date(gmailSyncTime);
+      }
+      if (imapSyncTime) {
+        this.lastImapSync = new Date(imapSyncTime);
       }
       if (indexScoreTime) {
         this.lastIndexScore = new Date(indexScoreTime);
@@ -75,11 +84,45 @@ export class BackgroundTaskManager {
     return new Date(this.lastGmailSync.getTime() + this.gmailSyncInterval);
   }
 
+  getNextImapSyncTime(): Date | null {
+    if (!this.lastImapSync) {
+      return new Date(Date.now() + this.imapSyncInterval);
+    }
+    return new Date(this.lastImapSync.getTime() + this.imapSyncInterval);
+  }
+
   getNextIndexScoreTime(): Date | null {
     if (!this.lastIndexScore) {
       return new Date(Date.now() + this.indexScoreInterval);
     }
     return new Date(this.lastIndexScore.getTime() + this.indexScoreInterval);
+  }
+
+  private async hasStoredImapConfig(): Promise<boolean> {
+    try {
+      const rawConfig = Platform.OS === 'web'
+        ? await AsyncStorage.getItem(this.imapConfigKey)
+        : await SecureStore.getItemAsync(this.imapConfigKey);
+
+      if (!rawConfig) {
+        return false;
+      }
+
+      const parsedConfig = JSON.parse(rawConfig);
+
+      const hasRequiredFields = Boolean(
+        parsedConfig &&
+        typeof parsedConfig.email === 'string' &&
+        typeof parsedConfig.appPassword === 'string' &&
+        typeof parsedConfig.host === 'string' &&
+        (typeof parsedConfig.port === 'number' || typeof parsedConfig.port === 'string')
+      );
+
+      return hasRequiredFields;
+    } catch (error) {
+      console.warn('[BackgroundTask] Failed to read stored IMAP configuration:', error);
+      return false;
+    }
   }
 
   /**
@@ -99,6 +142,20 @@ export class BackgroundTaskManager {
           return BackgroundFetch.BackgroundFetchResult.NewData;
         } catch (error) {
           console.error('[BackgroundTask] Gmail sync task failed:', error);
+          return BackgroundFetch.BackgroundFetchResult.Failed;
+        }
+      });
+
+      // Define IMAP Sync Task
+      TaskManager.defineTask(IMAP_SYNC_TASK, async () => {
+        console.log('[BackgroundTask] IMAP sync task started');
+        try {
+          const result = await this.runImapSync();
+          return result.success
+            ? BackgroundFetch.BackgroundFetchResult.NewData
+            : BackgroundFetch.BackgroundFetchResult.NoData;
+        } catch (error) {
+          console.error('[BackgroundTask] IMAP sync task failed:', error);
           return BackgroundFetch.BackgroundFetchResult.Failed;
         }
       });
@@ -136,7 +193,7 @@ export class BackgroundTaskManager {
    */
   async runGmailDeltaSync(): Promise<{ success: boolean; error?: string }> {
     console.log('[BackgroundTask] Starting Gmail delta sync (device-only)...');
-    
+
     try {
       const { ENABLE_GOOGLE_OAUTH } = await import('@/src/flags');
       if (!ENABLE_GOOGLE_OAUTH) {
@@ -169,6 +226,53 @@ export class BackgroundTaskManager {
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+
+  async runImapSync(): Promise<{ success: boolean; mailbox?: string; messageUids?: string[]; error?: string }> {
+    console.log('[BackgroundTask] Starting IMAP sync (device-only)...');
+
+    try {
+      const { imapService } = await import('./ImapService');
+
+      const support = await imapService.isSyncSupported();
+      if (!support.supported) {
+        const reason = support.reason ?? 'IMAP sync is not supported on this platform';
+        console.log(`[BackgroundTask] IMAP sync skipped: ${reason}`);
+        return { success: false, error: reason };
+      }
+
+      const hasConfig = await this.hasStoredImapConfig();
+      if (!hasConfig) {
+        console.log('[BackgroundTask] IMAP sync skipped - no stored configuration found');
+        return { success: false, error: 'IMAP account not connected' };
+      }
+
+      const result = await imapService.syncMailbox();
+      if (!result.success) {
+        const errorMessage = result.error ?? 'Unknown IMAP sync error';
+        console.warn('[BackgroundTask] IMAP sync failed:', errorMessage);
+        return { success: false, error: errorMessage };
+      }
+
+      this.lastImapSync = new Date();
+      await this.saveLastRunTime('lastImapSync', this.lastImapSync);
+
+      const mailbox = result.mailbox ?? 'INBOX';
+      const messageCount = result.messageUids?.length ?? 0;
+      console.log(`[BackgroundTask] IMAP sync completed for ${mailbox} (${messageCount} message UIDs)`);
+
+      return {
+        success: true,
+        mailbox: result.mailbox,
+        messageUids: result.messageUids,
+      };
+    } catch (error) {
+      console.error('[BackgroundTask] IMAP sync failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -301,6 +405,27 @@ export class BackgroundTaskManager {
           console.warn('[BackgroundTask] Could not register Gmail sync task:', error);
         }
 
+        // Register IMAP Sync when supported and configured
+        try {
+          const { imapService } = await import('./ImapService');
+          const support = await imapService.isSyncSupported();
+
+          if (!support.supported) {
+            console.log('[BackgroundTask] IMAP sync not registered:', support.reason ?? 'Unsupported platform');
+          } else if (!(await this.hasStoredImapConfig())) {
+            console.log('[BackgroundTask] IMAP sync not registered: IMAP account not configured');
+          } else {
+            await BackgroundFetch.registerTaskAsync(IMAP_SYNC_TASK, {
+              minimumInterval: 4 * 60 * 60, // 4 hours
+              stopOnTerminate: false,
+              startOnBoot: true,
+            });
+            console.log('[BackgroundTask] IMAP sync registered (4 hour interval)');
+          }
+        } catch (error) {
+          console.warn('[BackgroundTask] Could not register IMAP sync task:', error);
+        }
+
         // Register Index and Score (heavier nightly job)
         try {
           await BackgroundFetch.registerTaskAsync(INDEX_AND_SCORE_TASK, {
@@ -331,6 +456,7 @@ export class BackgroundTaskManager {
 
     try {
       await BackgroundFetch.unregisterTaskAsync(GMAIL_DELTA_SYNC_TASK);
+      await BackgroundFetch.unregisterTaskAsync(IMAP_SYNC_TASK);
       await BackgroundFetch.unregisterTaskAsync(INDEX_AND_SCORE_TASK);
       console.log('[BackgroundTask] Background tasks unregistered');
     } catch (error) {
@@ -367,18 +493,22 @@ export class BackgroundTaskManager {
     
     try {
       await this.registerBackgroundTasks();
-      
+
       // Check if tasks were actually registered
       const gmailRegistered = await this.isTaskRegistered(GMAIL_DELTA_SYNC_TASK);
+      const imapRegistered = await this.isTaskRegistered(IMAP_SYNC_TASK);
       const scoreRegistered = await this.isTaskRegistered(INDEX_AND_SCORE_TASK);
-      
+
       if (gmailRegistered) {
         console.log('[BackgroundTask] Gmail sync scheduled (device-only, every 4 hours)');
+      }
+      if (imapRegistered) {
+        console.log('[BackgroundTask] IMAP sync scheduled (device-only, every 4 hours)');
       }
       if (scoreRegistered) {
         console.log('[BackgroundTask] Index & Score scheduled (local processing, every 24 hours)');
       }
-      if (!gmailRegistered && !scoreRegistered) {
+      if (!gmailRegistered && !imapRegistered && !scoreRegistered) {
         console.log('[BackgroundTask] Background tasks not available in Expo Go - will work in production builds');
       }
     } catch (error) {
@@ -393,8 +523,12 @@ export class BackgroundTaskManager {
    * Returns task status with privacy compliance indicators
    */
   async getTaskStatus() {
-    const gmailRegistered = await this.isTaskRegistered(GMAIL_DELTA_SYNC_TASK);
-    const scoreRegistered = await this.isTaskRegistered(INDEX_AND_SCORE_TASK);
+    const [gmailRegistered, imapRegistered, scoreRegistered, imapConfigured] = await Promise.all([
+      this.isTaskRegistered(GMAIL_DELTA_SYNC_TASK),
+      this.isTaskRegistered(IMAP_SYNC_TASK),
+      this.isTaskRegistered(INDEX_AND_SCORE_TASK),
+      this.hasStoredImapConfig(),
+    ]);
 
     return {
       gmailSync: {
@@ -403,6 +537,16 @@ export class BackgroundTaskManager {
         interval: this.gmailSyncInterval,
         isRegistered: gmailRegistered,
         taskName: GMAIL_DELTA_SYNC_TASK,
+        privacyMode: 'device-only',
+        dataTransmission: 'none',
+      },
+      imapSync: {
+        lastRun: this.lastImapSync,
+        nextRun: this.getNextImapSyncTime(),
+        interval: this.imapSyncInterval,
+        isRegistered: imapRegistered,
+        isConfigured: imapConfigured,
+        taskName: IMAP_SYNC_TASK,
         privacyMode: 'device-only',
         dataTransmission: 'none',
       },
