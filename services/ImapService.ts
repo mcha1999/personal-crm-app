@@ -14,7 +14,7 @@ let transportInitializationError: Error | null = null;
 if (Platform.OS !== 'web') {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    cachedTransport = require(SOCKET_LIBRARY_NAME) as TcpSocketModule;
+    cachedTransport = require('react-native-tcp-socket') as TcpSocketModule;
   } catch (error) {
     const reason = error instanceof Error ? error.message : 'Unknown error';
     const message = `Failed to load ${SOCKET_LIBRARY_NAME}. Ensure the library is installed and linked. ${reason}`;
