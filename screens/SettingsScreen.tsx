@@ -141,7 +141,7 @@ export const SettingsScreen: React.FC = () => {
   const formatLastRunTime = (date: Date): string => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
-    
+
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
@@ -156,6 +156,59 @@ export const SettingsScreen: React.FC = () => {
       return `${minutes}m ago`;
     }
     return 'Just now';
+  };
+
+  const parseMaybeDate = (value: Date | string | null | undefined): Date | null => {
+    if (!value) return null;
+    return value instanceof Date ? value : new Date(value);
+  };
+
+  const getGmailSyncSubtitle = (): string => {
+    if (!ENABLE_GOOGLE_OAUTH || !GoogleAPIService) {
+      return 'Gmail sync disabled in this build';
+    }
+
+    if (!isGoogleAuthenticated) {
+      return 'Connect Gmail to enable sync';
+    }
+
+    const lastRun = parseMaybeDate(taskStatus?.gmailSync?.lastRun);
+    const nextRun = parseMaybeDate(taskStatus?.gmailSync?.nextRun);
+
+    if (lastRun) {
+      return `Last run ${formatLastRunTime(lastRun)}`;
+    }
+
+    if (nextRun) {
+      return `Next scheduled ${formatNextRunTime(nextRun)}`;
+    }
+
+    return 'Trigger Gmail delta sync now';
+  };
+
+  const getImapSyncSubtitle = (): string => {
+    if (Platform.OS === 'web') {
+      return 'IMAP sync requires the native app';
+    }
+
+    const lastRun = parseMaybeDate(taskStatus?.imapSync?.lastRun);
+    const nextRun = parseMaybeDate(taskStatus?.imapSync?.nextRun);
+    const isConfigured = Boolean(taskStatus?.imapSync?.isConfigured);
+    const isRegistered = Boolean(taskStatus?.imapSync?.isRegistered);
+
+    if (!isConfigured) {
+      return 'Connect an IMAP account to enable sync';
+    }
+
+    if (lastRun) {
+      return `Last run ${formatLastRunTime(lastRun)}`;
+    }
+
+    if (isRegistered && nextRun) {
+      return `Next scheduled ${formatNextRunTime(nextRun)}`;
+    }
+
+    return 'Trigger IMAP mailbox sync now';
   };
 
   const handleGoogleAPIToggle = async (enabled: boolean) => {
@@ -206,7 +259,7 @@ export const SettingsScreen: React.FC = () => {
     try {
       const taskManager = BackgroundTaskManager.getInstance();
       const result = await taskManager.runGmailDeltaSync();
-      
+
       if (result.success) {
         Alert.alert('Success', 'Gmail sync completed (all processing local)');
       } else {
@@ -221,11 +274,40 @@ export const SettingsScreen: React.FC = () => {
     }
   };
 
+  const handleManualImapSync = async () => {
+    try {
+      const taskManager = BackgroundTaskManager.getInstance();
+      const result = await taskManager.runImapSync();
+
+      if (result.success) {
+        const mailbox = result.mailbox ?? 'INBOX';
+        const messageCount = result.messageUids?.length ?? 0;
+        const details = `Mailbox: ${mailbox}\nMessages processed: ${messageCount}`;
+        Alert.alert('Success', `IMAP sync completed.\n${details}`);
+      } else {
+        const errorMessage = result.error || 'Unknown error';
+        const normalized = errorMessage.toLowerCase();
+        const title = normalized.includes('not supported')
+          ? 'IMAP Sync Not Supported'
+          : normalized.includes('not connected')
+            ? 'IMAP Sync Unavailable'
+            : 'IMAP Sync Failed';
+        Alert.alert(title, errorMessage);
+      }
+
+      const status = await taskManager.getTaskStatus();
+      setTaskStatus(status);
+    } catch (error) {
+      console.error('[SettingsScreen] IMAP sync error:', error);
+      Alert.alert('Error', 'Failed to sync IMAP mailbox');
+    }
+  };
+
   const handleManualScore = async () => {
     try {
       const taskManager = BackgroundTaskManager.getInstance();
       const result = await taskManager.runIndexAndScore();
-      
+
       if (result.success) {
         Alert.alert('Success', `Scoring completed. Updated ${result.scoresComputed} contacts.`);
       } else {
@@ -535,6 +617,20 @@ export const SettingsScreen: React.FC = () => {
           subtitle: emailLinkSubtitle,
           type: 'action' as const,
           onPress: () => router.push('/email-setup'),
+        },
+        ...((ENABLE_GOOGLE_OAUTH && GoogleAPIService) ? [{
+          icon: <RefreshCw size={20} color="#3498DB" />,
+          label: 'Sync Gmail now',
+          subtitle: getGmailSyncSubtitle(),
+          type: 'action' as const,
+          onPress: handleManualSync,
+        }] : []),
+        {
+          icon: <RefreshCw size={20} color="#8E44AD" />,
+          label: 'Sync IMAP mailbox now',
+          subtitle: getImapSyncSubtitle(),
+          type: 'action' as const,
+          onPress: handleManualImapSync,
         },
       ],
     },
