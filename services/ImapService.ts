@@ -9,7 +9,7 @@ import type { TcpSocket, TcpSocketConnectOpts } from 'react-native-tcp-socket';
 type TcpSocketModule = typeof import('react-native-tcp-socket');
 
 const SOCKET_LIBRARY_NAME = 'react-native-tcp-socket';
-const SOCKET_LOAD_ERROR_MESSAGE = `Failed to load ${SOCKET_LIBRARY_NAME}. Ensure the library is installed and linked.`;
+const SOCKET_NATIVE_ONLY_MESSAGE = `IMAP sync requires a native build that includes the ${SOCKET_LIBRARY_NAME} module.`;
 
 let cachedTransport: TcpSocketModule | null = null;
 let transportInitializationError: Error | null = null;
@@ -20,11 +20,11 @@ try {
   if (resolvedTransport) {
     cachedTransport = resolvedTransport;
   } else {
-    transportInitializationError = new Error(SOCKET_LOAD_ERROR_MESSAGE);
+    transportInitializationError = new Error(SOCKET_NATIVE_ONLY_MESSAGE);
   }
 } catch (error) {
   const reason = error instanceof Error ? error.message : 'Unknown error';
-  const message = `${SOCKET_LOAD_ERROR_MESSAGE} ${reason}`;
+  const message = `${SOCKET_NATIVE_ONLY_MESSAGE} (${reason})`;
 
   if (error instanceof Error) {
     error.message = message;
@@ -630,7 +630,7 @@ export class ImapService {
       throw transportInitializationError;
     }
 
-    throw new Error(SOCKET_LOAD_ERROR_MESSAGE);
+    throw new Error(SOCKET_NATIVE_ONLY_MESSAGE);
   }
 
   private async loadStoredConfig(): Promise<ImapAccountConfig | null> {
